@@ -8,9 +8,9 @@ Personal backups are complex and time-consuming. The goal of this project is to 
 
 ### General concepts
 
-As a user, I have several **devices** (my linux laptop, my server, my S3 bucket, my USB keys, my hard drives, my github account...). I may have valuable data on each of these devices. The part of the data of each device that is the reference one in the **primary data**. For instance, my SSH keys are primarily on my laptop, but my photos are primarily on my hard drive, and my app datas are on my server.
+As a user, I have several **devices** (my linux laptop, my server, my S3 bucket, my USB keys, my hard drives, my github account...). I may have valuable data on each of these devices. The data that are directly usable and read/updated on a device is **primary data**. For instance, my SSH keys are primarily on my laptop, but my photos are primarily on my hard drive, and my app datas are on my server.
 
-I want to backup my primary data on other devices. The data that is backed up is called **secondary data**. A storage device is typically made of **free space**, **primary data**, **secondary data** and **ignored data**.
+I want to backup my primary data on other devices. The data that is backed up is called **secondary data**. The secondary data is not directly used on that device. A storage device is typically made of **free space**, **primary data**, **secondary data** and **ignored data**. Devices may have both primary (the data you work with) and secondary data (the unused data copied from another device).
 
 All data is not created equal:
 
