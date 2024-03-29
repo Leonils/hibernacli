@@ -2,23 +2,48 @@
 
 ## Context
 
-This project is launched in the context of the TDD course of CentraleSupélec and a functional version shall be completed by march 29th, 2024. This proposal explores the main features of the MVP.
+This project is launched in the context of the TDD course of CentraleSupélec
+and a functional version shall be completed by march 29th, 2024. This proposal
+explores the main features of the MVP.
+
+## Key hypothesis
+
+For the first prototype, we may assume the followings, keeping in mind they will
+become false at one point in time.
+
+- As a user, I have a single primary device, with only primary data, and I
+  connect to it secondary devices, with only secondary data. Let's call this
+  device the **primary device**
+
+- As a user, my only secondary devices are devices physically connected to the
+  computer (USB keys, External hard drives, secondary partitions, ...)
 
 ## Key features
 
-The MVP shall be able to:
+- As a user, I have a **global configuration file** on my _primary device_, so the
+  following settings are saved:
 
-- Open a configuration file global to the device, defining :
+  - Backup requirements (named classes of backups specifying a target number of
+    copy, and a minimum security level)
+  - Available storages (named devices with a type, a provided security, and
+    required information to connect to them)
 
-  - Backup requirements (named classes of backups specifying a target number of copy, and a minimum security level)
-  - Available storages (named devices with a type, and required information to connect to them)
+- As a user I can navigate files on my device and identify "projects" : set of
+  files all related together
 
-- We shall support storage of type local (a mounted drive) for now.
+- As a user, I can categorize projects on his device between the states:
 
-- The user shall be able to categorize all files on his device between "ignored" (saved in the configuration file), "not categorized" (no info yet), and "to backup" (saved in a configuration file local to the project).
+  - **ignored** (explicit, saved in the configuration file),
+  - **not categorized** (implicit, no info saved neither in local configuration
+    file, nor in local one),
+  - **to backup** (saved in a configuration file local to the project, so moving
+    it do not break the system).
 
-- The user shall be able to select a project and specify the backup requirements for this project.
+- As a user, I can navigate projects and see their state. When a target backup
+  requirement class is specified, I can see what is the status of the backup
+  process: does it is actually backuped? On which device? what is the status of
+  each backup? Are they up to date?
 
-- The user shall be able to select an available storage matching the requirements of the project and backup the project to this storage.
-
-- The user shall be able to see the state of his backups (ignored, not categorized, backed up, up to date, outdated) and the progress of his categorization and backups.
+- As a user, I can specify or upgrade the requirement class of a project. Then,
+  I can choose among available storages to fullfill these requirement. I'm guided
+  through this process
