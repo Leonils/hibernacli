@@ -47,3 +47,10 @@ become false at one point in time.
 - As a user, I can specify or upgrade the requirement class of a project. Then,
   I can choose among available storages to fullfill these requirement. I'm guided
   through this process
+
+- As a user, I can run a backup from the primary to a given secondary, and it will
+  backup all projects configured to be backed up on this secondary that are not
+  up to date
+
+- As a user, I can explore the content of a secondary drive, and restore a project
+  by downloading a zip with all of its content on my primary device. 
