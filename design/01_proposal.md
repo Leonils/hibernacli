@@ -1,16 +1,16 @@
-# Cli backup proposal
+# Proposal number 1 : Business concepts
 
 ## Context
 
 Personal backups are complex and time-consuming. The goal of this project is to create a simple and easy-to-use tool to backup files and directories. This tool does not aim to just perform backups, but also to guide the user in the process of determining what to backup and how.
 
-## Business concepts
-
-### General concepts
+## General concepts
 
 As a user, I have several **devices** (my linux laptop, my server, my S3 bucket, my USB keys, my hard drives, my github account...). I may have valuable data on each of these devices. The data that are directly usable and read/updated on a device is **primary data**. For instance, my SSH keys are primarily on my laptop, but my photos are primarily on my hard drive, and my app datas are on my server.
 
 I want to backup my primary data on other devices. The data that is backed up is called **secondary data**. The secondary data is not directly used on that device. A storage device is typically made of **free space**, **primary data**, **secondary data** and **ignored data**. Devices may have both primary (the data you work with) and secondary data (the unused data copied from another device).
+
+In this project, we consider that the secondary data has the sole purpose of being a backup of the primary data. We do not consider the case where the user might want to access the secondary data directly because it would be easier to access than the primary data. (This case seems unlikely, but it might exists : for instance, if we backup on a laptop the content of a S3 bucket, the primary is the S3, the secondary is the laptop, but the user might want to access the secondary data directly on the laptop instead of connecting to the S3). We explicitly exclude this user case from the scope of the project.
 
 All data is not created equal:
 
@@ -25,7 +25,7 @@ From these concepts, there are different class of backups:
 - **Encryption**: some data might need to be encrypted (private data), while some other data might not (public data).
 - **History**: we might need to keep several versions of the data, or only the last one.
 
-### Projects / Folders
+## Projects / Folders
 
 When managing data, the **file** is not the right unit. I don't want to classify each file individually, but I want to classify "**projects**", or "**folders**". For instance, all photos of my last trip are part of the same project. They are homogeneous and constitute a whole.
 
@@ -52,7 +52,7 @@ project/
 
 Here, the project might be important, gited, confidential, and need 3 copies. On the other hand, node_modules must be excluded from the backup, and .env is not as important as the project (because we just have to recreate it, and regenerate the tokens of the dev environment) but is still useful. However it is more confidential than the project itself.
 
-### State of backups
+## State of backups
 
 A project might have several states of backups:
 
@@ -64,7 +64,7 @@ A project might have several states of backups:
 
 In the cli, the user must be able to overview his projects, their state, and his progress in categorizing and backing them up.
 
-### Indexes
+## Indexes
 
 Comparing files is time-consuming (and for some storages costly). We need to keep indexes of the files in each storage. If the index is add-only, we can easily merge them even if they diverged. Each storage will have a copy of the index. The index on a storage is certainly always up to date about the secondary data on this storage (because we had access to the storage to update it). However, it might not always be up to date about the secondary data of the other storages. But eventually, the indexes will converge when the user backup to all storages.
 
