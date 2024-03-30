@@ -1,0 +1,71 @@
+@startuml device_factory
+
+title Factory and Iterator patterns\nto create devices
+
+hide empty members
+
+package cli {
+    struct CLI {
+        +run()
+        -create_device()
+        -ask_question(question: Question): QuestionAnswer
+    }
+
+    note top of CLI
+        fn create_device() {
+            let factory = DeviceFactory::new();
+            while factory.has_next_question() {
+                let question = factory.get_next_question();
+                let answer = ask_question(question);
+                factory.set_answer(answer);
+            }
+            let device = factory.createDevice();
+            return device;
+        }
+    end note
+}
+
+package core {
+    enum QuestionType {
+        TEXT
+        UNIX_PATH
+        WINDOWS_PATH
+        IP_ADDRESS
+        NUMBER
+        DATE
+        ...
+    }
+
+    struct Question {
+        +question: string
+        +answer_type: string
+    }
+
+    interface Device {
+    }
+
+    interface AbstractDeviceFactory<TDevice implements Device> {
+        has_next_question(): bool
+        get_next_question(): Question
+        set_answer(answer: QuestionAnswer)
+        createDevice(): TDevice
+    }
+
+    AbstractDeviceFactory *- Question
+    Question *- QuestionType
+    Device <. AbstractDeviceFactory: creates
+}
+
+package devices {
+    class DeviceAFactory implements core.AbstractDeviceFactory {
+    }
+
+    class DeviceA implements core.Device {
+    }
+
+    DeviceA <. DeviceAFactory: creates
+}
+
+cli.CLI ..> core.AbstractDeviceFactory: <<uses>>
+
+@enduml
