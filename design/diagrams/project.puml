@@ -1,0 +1,64 @@
+@startuml project
+
+' skinparam Ranksep 40
+' skinparam nodesep 40
+' left to right direction
+hide empty members
+
+enum SecurityLevel {
+    NetworkPublic,
+    NetworkUnreferenced,
+    NetworkUntrustedRestricted,
+    NetworkTrustedRestricted,
+    NetworkLocal,
+    Local,
+    LocalMaxSecurity,
+}
+
+struct BackupRequirementClass {
+    target_copies: u32 = 3,
+    target_locations: u32 = 2,
+    name: String,
+}
+
+
+struct Project {
+    name:String
+    location:String
+}
+
+rectangle "TrackingStatus" <<Enum>> {
+    struct TrackedProject {
+        last_update: Option<Instant>,
+    }
+
+    struct UntrackedProject {}
+    struct IgnoredProject {}
+}
+
+struct Device {
+    name:String
+    location:String
+    device_type_name: String
+    last_connection: Option<Instant>
+    last_disconnection: Option<Instant>
+}
+
+
+struct ProjectCopy {
+    last_backup: Option<Instant>,
+}
+
+Project *-- TrackingStatus: tracking_status
+TrackingStatus -[hidden]- TrackedProject
+TrackingStatus -[hidden]- UntrackedProject
+TrackingStatus -[hidden]- IgnoredProject
+
+TrackedProject *-- ProjectCopy: current_copies
+ProjectCopy o- BackupRequirementClass: backup_requirements
+Device -o ProjectCopy: secondary_device
+
+Device o-- SecurityLevel: security_level
+BackupRequirementClass o-- SecurityLevel: min_security_level
+
+@enduml

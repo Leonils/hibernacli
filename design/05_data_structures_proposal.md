@@ -45,38 +45,16 @@ struct BackupRequirementClass {
 
 ## Project status
 
-A project might have several statuses:
+A project might have several tracking statuses, and once tracked, it may have
+a few copies on devices. These copies have a backup status:
 
 ```rs
-enum ProjectTrackingStatus {
-    // The project is explicitly not tracked, as specified in the global config
-    Ignored,
-
-    // The project is explicitly tracked, it has a config file
-    Tracked,
-
-    // The project is not yet specified. This is a risk and the user should
-    // eventually specify it.
-    Unspecified,
-}
-
-struct ProjectBackupStatus {
+struct ProjectCopy {
     // What is the last time a backup was made
     last_backup: Option<Instant>,
 
-    // Is the secondary device where this backup is stored currently connected?
-    currently_connected: bool,
-}
-
-struct ProjectStatus {
-    // The tracking status of the project
-    tracking_status: ProjectTrackingStatus,
-
-    // The current copies
-    current_copies: Vec<ProjectBackup>,
-
-    // Last update of the project content
-    last_update: Instant,
+    // What is the device on which it was done?
+    secondary_device: Device,
 }
 ```
 
@@ -96,13 +74,31 @@ struct Project {
     // The exact API might be found later
     location: String,
 
-    // The target backup requirement class
-    backup_requirement_class: BackupRequirementClass,
+    // What is this project tracking status? might be explicitely
+    // ignored, implicitly uncategorized, or tracked and ready to be
+    // backed up.
+    tracking_status: ProjectTrackingStatus,
+}
 
-    // Status of the project
-    status: ProjectStatus,
+enum ProjectTrackingStatus {
+    TrackedProject {
+        // The target backup requirement class
+        backup_requirement_class: BackupRequirementClass,
+
+        // Update date of the last updated file in the project
+        last_update: Option<Instant>
+
+        // The actual copies of the project on secondary drives
+        current_copies: Vec<ProjectCopy>
+    }
+    UntrackedProject,
+    IgnoredProject,
 }
 ```
+
+To summarize, the following diagram shows the main data structures and their relationships:
+
+![Main data structures](./diagrams/project.svg)
 
 ## Device
 
