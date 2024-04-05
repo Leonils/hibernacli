@@ -1,3 +1,5 @@
+use hibernacli::cli::run;
+
 fn main() {
-    println!("Hello, world!");
+    run();
 }

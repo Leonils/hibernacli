@@ -28,4 +28,4 @@ mod devices {
     mod local_unix_file_storage;
 }
 
-mod cli;
+pub mod cli;
