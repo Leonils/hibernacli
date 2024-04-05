@@ -26,7 +26,7 @@ pub enum ProjectTrackingStatus {
         last_update: Option<Instant>,
 
         // The actual copies of the project on secondary drives
-        current_copies: Vec<ProjectCopy>,
+        current_copies: Vec<Box<ProjectCopy>>,
     },
     UntrackedProject,
     IgnoredProject,
@@ -37,5 +37,5 @@ pub struct ProjectCopy {
     last_backup: Option<Instant>,
 
     // What is the device on which it was done?
-    secondary_device: Device,
+    secondary_device: dyn Device,
 }

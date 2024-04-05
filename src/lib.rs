@@ -13,8 +13,8 @@ mod core {
 mod models {
     mod backup_requirement;
     mod primary_device;
-    mod project;
-    mod secondary_device;
+    pub mod project;
+    pub mod secondary_device;
 }
 
 // Adapters (interfaces implemented by core)
