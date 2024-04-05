@@ -24,7 +24,6 @@ pub trait Device {
 
 pub trait DeviceFactory {
     fn get_question(&self) -> Question;
-    fn set_answer(&self, answer: String);
     fn has_next(&self) -> bool;
     fn build(&self) -> impl Device;
 }
