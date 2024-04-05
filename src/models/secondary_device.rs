@@ -2,6 +2,11 @@ use std::time::Instant;
 
 use super::{backup_requirement::SecurityLevel, question::Question};
 
+pub struct DeviceFactoryKey {
+    pub key: String,
+    pub readable_name: String,
+}
+
 pub trait Device {
     // The name of the device
     fn get_name(&self) -> String;
