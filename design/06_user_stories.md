@@ -1,31 +1,26 @@
 # Proposal number 6 : User stories
 
-In order to define the features required to the backup tool, we need user stories that cover use cases for the tool. These should be the point of focus of testing and development. They will represent **what** the code does, in order to create the **how** as a consequence. This proposal attempts to describe them.
+In order to define the features required to the backup tool, we need user stories that cover use cases for the tool. These should be the point of focus of testing and development. These represent the flow of the user through the tool. It should mention or imply the features that are explicited in proposal 2.
 
 One may find this file to be incomplete, as it only represents the feature of a Minimum Viable Product. A backup over the network is not included, as well as an automated way to backup data, or a description of differences between backup. Those may be included in further versions.
 
-## Global configuration
+## User Story 1 : Project configuration
 
-As a user **using the CLI**, I want to be able to:
+- **Initialize a device** : I want to plug in a physical storage device. From the CLI, I can choose the device to register it in the backup tool. The CLI should guide me through the process of initializing the device.
+- **Initialize a project** : for project at path `/path/to/project/`, I want to initialize a config file that represents the configuration of the backup. This configuration file should be editable by me.
 
-- `(1)` after plugging in my USB stick, HDD or SSD, create a new entry for it by providing all relevant information (name, type, location).
-- `(2)` edit and delete the properties of any support that has previously been registered.
+## User Story 2 : Backup process
 
-## Project configuration
+From a device that has been initialized in which a project has been configured.
 
-`(3)` As a user, I want to be able to initialize or edit a backup strategy for a specific repository by providing all the required configuration of that strategy : physical replication requirements, number of replication requirements, amount of security of said replications. For this repository I can choose to provide with a whitelist and/or a blacklist of security levels for each file/folder that should be included in the backup. The state of the backup should follow the following rules:
+- **Backup my projects**: From the CLI, I want to run a command that will synchronize all available storage devices on all configured projects.
 
-- backup statuses are **inherited by default**. Without any instruction for a specific file or folder (through a blacklist/whitelist), the status of a file/folder is the one of its parent repository. If the parent repository is not part of the backup project, the status is determined by the configuration of the project. If the configuration cannot determine if the file/folder is to be backed up, it is `not categorized`
-- backup status are **ordered** according to the following rule: **Not Categorized** is less restrictive that **Ignored** which is less restrictive than **Backed up**. A file/folder cannot have a more restrictive status than its parent repository. For example, a `misc` folder that is `ignored` restricts any file/folder inside it to be `ignored` or `not categorized`.
+## User Story 3 : Device management
 
-**Note:** As this proposal is for an MVP only, the configuration editing step may be done by editing a file.
+- **List devices** : From the CLI, I want to list all the devices that have been initialized.
+- **Remove a device** : From the CLI, I want to remove a device that has been initialized.
 
-## Backup process
+## User Story 4 : Project management
 
-`(4)` As a user, I want to be able to plug my storage device, get the properties of the last backup and start a new backup. The backup process should follow the rules of the project configuration as specified above.
-
-## Data recovery
-
-`(5)` As a user, I want to be able to navigate the filesystem of my external storage device and find for each distinct project a subtree of the project's filesystem. The subtree should be the snapshot of the project at that time of last backup, that includes only the files/folder that have the `backed up` status. The rules mentionned before ensure this subtree is connex.
-
-**Note**: Again, the data recovery process could be done through the CLI in a second step.
+- **List projects** : From the CLI, I want to list all the projects that have been configured.
+- **Remove a project** : From the CLI, I want to remove a project that has been configured.
