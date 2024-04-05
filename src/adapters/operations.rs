@@ -9,7 +9,7 @@ mod device {
     use crate::models::secondary_device::{Device, DeviceFactory};
 
     pub trait DeviceOperations {
-        fn get_device_factory(&self) -> dyn DeviceFactory;
+        fn get_device_factory(&self) -> impl DeviceFactory;
         fn add_device(&self, device: impl Device);
         fn remove_by_name(&self);
         fn list(&self) -> Vec<Box<dyn Device>>;
