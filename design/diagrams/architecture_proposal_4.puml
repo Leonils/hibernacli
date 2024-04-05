@@ -1,0 +1,67 @@
+@startuml architecture_proposal_4
+
+title "Hibernate hexagonal architecture proposal 4"
+
+skinparam nodesep 50
+hide empty members
+allow_mixing
+
+component main <<binary>> 
+
+rectangle "Adapters" #FAFAD2 {
+    class CLI <<A, #FAFAD2, adapter>>
+
+    rectangle "Business side / Ports" #FFCC00 {
+        interface "Operations" as IOperations  <<P, #FFCC00, port>> {
+            <<usecase>> define backup requirement classes
+            <<usecase>> define available storages
+            <<usecase>> navigate projects of primary
+            <<usecase>> get project backup status
+            <<usecase>> trigger backup to secondary
+            <<usecase>> download project backup
+            <<usecase>> update project backup target class
+            <<usecase>> explore content of secondary
+        }
+
+        rectangle "Business side / Core" #FF8800 {
+            class "Business logic" as BusinessLogic <<M, #FF8800, module>> {
+
+            }
+        }
+
+        interface "Primary device" as PrimaryDevicePorts <<P, #FFCC00, port>>  {
+            <<interaction>> get global config file content
+            <<interaction>> walk device tree file
+            <<interaction>> get project config file content
+        }
+
+        interface "Secondary device" as SecondaryDevicePorts <<P, #FFCC00, port>> {
+            <<interaction>> connect using config
+            <<interaction>> walk through backup files
+            <<interaction>> download backup files of project
+            <<interaction>> upload new backup file of project
+        }
+    }
+
+    class LocalUnixStorage <<A, #FAFAD2, adapter>>
+    class S3Storage <<A, #FAFAD2, adapter>>
+}
+
+CLI ..> IOperations: <<uses>>
+
+IOperations <|-- BusinessLogic: <<implements>>
+
+BusinessLogic ..> PrimaryDevicePorts: <<uses>>
+BusinessLogic ..> SecondaryDevicePorts: <<uses>>
+
+PrimaryDevicePorts <|-- LocalUnixStorage: <<implements>>
+
+SecondaryDevicePorts <|-- S3Storage: <<implements>>
+SecondaryDevicePorts <|-- LocalUnixStorage: <<implements>>
+
+
+main .[norank]> CLI: <<starts>>
+main .> BusinessLogic: <<injects>>
+main .> LocalUnixStorage: <<injects>>
+
+@enduml
