@@ -1,5 +1,6 @@
 enum QuestionType {
     String,
+    UnixPath,
     SingleChoice(Vec<String>),
 }
 
@@ -22,16 +23,6 @@ impl Question {
         &self.statement
     }
 
-    fn validate_answer(&self, answer: &String) -> Result<(), String> {
-        match &self.question_type {
-            QuestionType::SingleChoice(answers) if !answers.contains(&answer) => Err(format!(
-                "Invalid answer. Possible answers are: {}",
-                answers.join(", ")
-            )),
-            _ => Ok(()),
-        }
-    }
-
     pub fn set_answer(&mut self, answer: String) -> Result<(), String> {
         self.validate_answer(&answer)?;
         self.answer = Some(answer);
@@ -42,6 +33,19 @@ impl Question {
         match &self.answer {
             Some(answer) => Ok(answer.to_string()),
             None => Err("No answer provided".to_string()),
+        }
+    }
+
+    fn validate_answer(&self, answer: &String) -> Result<(), String> {
+        match &self.question_type {
+            QuestionType::SingleChoice(answers) if !answers.contains(&answer) => Err(format!(
+                "Invalid answer. Possible answers are: {}",
+                answers.join(", ")
+            )),
+            QuestionType::UnixPath if !answer.starts_with('/') && !answer.starts_with('~') => {
+                Err("Invalid answer. Should be a valid Unix path".to_string())
+            }
+            _ => Ok(()),
         }
     }
 }
@@ -99,5 +103,28 @@ mod tests {
             QuestionType::SingleChoice(vec!["Red".to_string(), "Blue".to_string()]),
         );
         question.set_answer("Green".to_string()).unwrap_err();
+    }
+
+    #[test]
+    fn test_create_unix_path_question_and_answer_it_with_regular_path_shall_save_answer() {
+        let mut question = Question::new("Where is your home?".to_string(), QuestionType::UnixPath);
+        question.set_answer("/home/john".to_string()).unwrap();
+        assert_eq!(question.get_answer().unwrap(), "/home/john");
+    }
+
+    #[test]
+    fn test_create_unix_path_question_and_answer_it_with_bad_path_shall_save_answer() {
+        let mut question = Question::new("Where is your home?".to_string(), QuestionType::UnixPath);
+        let error = question
+            .set_answer("some bad path".to_string())
+            .unwrap_err();
+        assert_eq!(error, "Invalid answer. Should be a valid Unix path");
+    }
+
+    #[test]
+    fn test_create_unix_path_question_and_answer_it_with_home_path_shall_save_answer() {
+        let mut question = Question::new("Where is your home?".to_string(), QuestionType::UnixPath);
+        question.set_answer("~/john".to_string()).unwrap();
+        assert_eq!(question.get_answer().unwrap(), "~/john");
     }
 }
