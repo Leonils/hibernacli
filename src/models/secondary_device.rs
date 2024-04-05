@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use super::backup_requirement::SecurityLevel;
+use super::{backup_requirement::SecurityLevel, question::Question};
 
 pub trait Device {
     // The name of the device
@@ -22,21 +22,9 @@ pub trait Device {
     fn get_last_disconnection(&self) -> Option<Instant>;
 }
 
-pub enum DeviceFactoryQuestionType {
-    Text,
-    UnixPath,
-}
-
-pub struct DeviceFactoryQuestion {
-    pub question: String,
-    pub question_type: DeviceFactoryQuestionType,
-    pub default: Option<String>,
-    pub options: Option<Vec<String>>,
-}
-
 pub trait DeviceFactory {
-    fn get_question(&self) -> DeviceFactoryQuestion;
+    fn get_question(&self) -> Question;
     fn set_answer(&self, answer: String);
     fn has_next(&self) -> bool;
-    fn build(&self) -> dyn Device;
+    fn build(&self) -> impl Device;
 }

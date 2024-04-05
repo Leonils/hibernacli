@@ -1,10 +1,10 @@
-enum QuestionType {
+pub enum QuestionType {
     String,
     UnixPath,
     SingleChoice(Vec<String>),
 }
 
-struct Question {
+pub struct Question {
     statement: String,
     answer: Option<String>,
     question_type: QuestionType,
