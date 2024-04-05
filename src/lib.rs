@@ -12,7 +12,7 @@ mod core {
 // Public structures (low behavior, high data)
 mod models {
     mod backup_requirement;
-    mod primary_device;
+    pub mod primary_device;
     pub mod project;
     pub mod question;
     pub mod secondary_device;
