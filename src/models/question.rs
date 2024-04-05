@@ -22,7 +22,18 @@ impl Question {
         &self.statement
     }
 
+    fn validate_answer(&self, answer: &String) -> Result<(), String> {
+        match &self.question_type {
+            QuestionType::SingleChoice(answers) if !answers.contains(&answer) => Err(format!(
+                "Invalid answer. Possible answers are: {}",
+                answers.join(", ")
+            )),
+            _ => Ok(()),
+        }
+    }
+
     pub fn set_answer(&mut self, answer: String) -> Result<(), String> {
+        self.validate_answer(&answer)?;
         self.answer = Some(answer);
         Ok(())
     }
@@ -79,5 +90,14 @@ mod tests {
         );
         question.set_answer("Blue".to_string()).unwrap();
         assert_eq!(question.get_answer().unwrap(), "Blue");
+    }
+
+    #[test]
+    fn test_create_a_single_choice_question_and_answer_it_with_a_bad_answer_should_return_error() {
+        let mut question = Question::new(
+            "What is your favorite color?".to_string(),
+            QuestionType::SingleChoice(vec!["Red".to_string(), "Blue".to_string()]),
+        );
+        question.set_answer("Green".to_string()).unwrap_err();
     }
 }
