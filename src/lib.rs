@@ -2,6 +2,7 @@
 mod core {
     mod backup_execution;
     mod backup_exploration;
+    mod device_factories_registry;
     mod global_config;
     mod project_config;
     mod project_status;
