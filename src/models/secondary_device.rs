@@ -2,6 +2,7 @@ use std::time::Instant;
 
 use super::{backup_requirement::SecurityLevel, question::Question};
 
+#[derive(Debug, PartialEq, Clone)]
 pub struct DeviceFactoryKey {
     pub key: String,
     pub readable_name: String,

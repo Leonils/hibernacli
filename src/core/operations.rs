@@ -20,17 +20,20 @@ impl Operations {
     fn register_device_factory(
         &mut self,
         device_factory_key: String,
-        device_factory_description: String,
+        device_factory_readable_name: String,
         device_factory: Box<dyn DeviceFactory>,
     ) {
-        self.device_factory_registry
-            .register_device(device_factory_key, device_factory);
+        self.device_factory_registry.register_device(
+            device_factory_key,
+            device_factory_readable_name,
+            device_factory,
+        );
     }
 }
 
 impl DeviceOperations for Operations {
     fn get_available_device_factories(&self) -> Vec<DeviceFactoryKey> {
-        return vec![];
+        self.device_factory_registry.list_factories()
     }
 
     fn get_device_factory(&self, device_type: String) -> Option<&Box<dyn DeviceFactory>> {
