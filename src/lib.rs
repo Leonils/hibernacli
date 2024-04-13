@@ -4,6 +4,7 @@ mod core {
     mod backup_exploration;
     mod device_factories_registry;
     mod global_config;
+    pub mod operations;
     mod project_config;
     mod project_status;
     mod projects_scan;
@@ -19,8 +20,8 @@ mod models {
 }
 
 // Adapters (interfaces implemented by core)
-mod adapters {
-    mod operations;
+pub mod adapters {
+    pub mod operations;
     pub mod primary_device;
     mod secondary_device;
 }
