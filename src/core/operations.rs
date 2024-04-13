@@ -37,7 +37,8 @@ impl DeviceOperations for Operations {
     }
 
     fn get_device_factory(&self, device_type: String) -> Option<&Box<dyn DeviceFactory>> {
-        todo!()
+        self.device_factory_registry
+            .get_device_factory(&device_type)
     }
 
     fn add_device(&self, device: Box<dyn Device>) -> Result<Box<dyn Device>, Box<dyn Error>> {
@@ -79,5 +80,42 @@ mod test {
         assert_eq!(available_factories.len(), 1);
         assert_eq!(available_factories[0].key, "MockDevice");
         assert_eq!(available_factories[0].readable_name, "Mock Device");
+    }
+
+    #[test]
+    fn if_no_factory_is_registered_none_is_returned_when_retrieving_a_factory() {
+        let operations = Operations::new();
+        let device_factory = operations.get_device_factory("MockDevice".to_string());
+        assert!(device_factory.is_none());
+    }
+
+    #[test]
+    fn after_registering_a_factory_it_can_be_used_to_create_a_device() {
+        let mut operations = Operations::new();
+        operations.register_device_factory(
+            "MockDevice".to_string(),
+            "Mock Device".to_string(),
+            Box::new(MockDeviceFactory),
+        );
+
+        let device_factory = operations.get_device_factory("MockDevice".to_string());
+        assert!(device_factory.is_some());
+
+        let device_factory = device_factory.unwrap();
+        let device = device_factory.build();
+        assert_eq!(device.get_name(), "MockDevice");
+    }
+
+    #[test]
+    fn when_registering_a_factory_and_retrieving_a_not_added_one_it_shall_return_none() {
+        let mut operations = Operations::new();
+        operations.register_device_factory(
+            "MockDevice".to_string(),
+            "Mock Device".to_string(),
+            Box::new(MockDeviceFactory),
+        );
+
+        let device_factory = operations.get_device_factory("NotAdded".to_string());
+        assert!(device_factory.is_none());
     }
 }
