@@ -30,5 +30,5 @@ pub trait Device {
 pub trait DeviceFactory {
     fn get_question(&self) -> Question;
     fn has_next(&self) -> bool;
-    fn build(&self) -> impl Device;
+    fn build(&self) -> Box<dyn Device>;
 }
