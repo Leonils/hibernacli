@@ -1,3 +1,4 @@
+#[derive(Debug, PartialEq)]
 pub enum QuestionType {
     String,
     UnixPath,
@@ -17,6 +18,10 @@ impl Question {
             question_type,
             answer: None,
         }
+    }
+
+    pub fn get_question_type(&self) -> &QuestionType {
+        &self.question_type
     }
 
     pub fn get_statement(&self) -> &str {

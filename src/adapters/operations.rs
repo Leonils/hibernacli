@@ -8,7 +8,7 @@ mod help {
     }
 }
 
-mod device {
+pub mod device {
     use std::error::Error;
 
     use crate::models::secondary_device::{Device, DeviceFactory, DeviceFactoryKey};
@@ -32,11 +32,11 @@ mod device {
         /// Get a device factory by its key
         /// The key is the one returned by get_available_device_factories
         /// It might panic if the key does not exist
-        fn get_device_factory(&self, device_type: String) -> impl DeviceFactory;
+        fn get_device_factory(&self, device_type: String) -> Option<&Box<dyn DeviceFactory>>;
 
         /// Add a device to the list of devices
         /// The device is built by the factory returned by get_device_factory
-        fn add_device(&self, device: impl Device) -> Result<impl Device, Box<dyn Error>>;
+        fn add_device(&self, device: Box<dyn Device>) -> Result<Box<dyn Device>, Box<dyn Error>>;
 
         /// Once created, a device is identified by its unique name
         /// This function removes the device by its name

@@ -1,7 +1,11 @@
 use std::time::Instant;
 
-use super::{backup_requirement::SecurityLevel, question::Question};
+use super::{
+    backup_requirement::SecurityLevel,
+    question::{Question, QuestionType},
+};
 
+#[derive(Debug, PartialEq, Clone)]
 pub struct DeviceFactoryKey {
     pub key: String,
     pub readable_name: String,
@@ -28,7 +32,9 @@ pub trait Device {
 }
 
 pub trait DeviceFactory {
-    fn get_question(&self) -> Question;
+    fn get_question_statement(&self) -> &str;
+    fn get_question_type(&self) -> &QuestionType;
+    fn set_question_answer(&mut self, answer: String) -> Result<(), String>;
     fn has_next(&self) -> bool;
-    fn build(&self) -> impl Device;
+    fn build(&self) -> Result<Box<dyn Device>, String>;
 }
