@@ -1,5 +1,10 @@
 // Business logic implementation
 mod core {
+    #[cfg(test)]
+    pub mod test_utils {
+        pub mod mocks;
+    }
+
     mod backup_execution;
     mod backup_exploration;
     mod device_factories_registry;

@@ -34,46 +34,12 @@ impl DeviceFactoryRegistry {
 mod test {
     use std::time::Instant;
 
-    use crate::models::{
-        backup_requirement::SecurityLevel, question::Question, secondary_device::Device,
+    use crate::{
+        core::test_utils::mocks::MockDeviceFactory,
+        models::{backup_requirement::SecurityLevel, question::Question, secondary_device::Device},
     };
 
     use super::*;
-
-    struct MockDeviceFactory;
-    impl DeviceFactory for MockDeviceFactory {
-        fn get_question(&self) -> Question {
-            panic!("No question")
-        }
-        fn has_next(&self) -> bool {
-            false
-        }
-        fn build(&self) -> Box<dyn Device> {
-            Box::new(MockDevice)
-        }
-    }
-
-    struct MockDevice;
-    impl Device for MockDevice {
-        fn get_name(&self) -> String {
-            "MockDevice".to_string()
-        }
-        fn get_location(&self) -> String {
-            "Home".to_string()
-        }
-        fn get_security_level(&self) -> SecurityLevel {
-            SecurityLevel::NetworkUntrustedRestricted
-        }
-        fn get_device_type_name(&self) -> String {
-            "MockDevice".to_string()
-        }
-        fn get_last_connection(&self) -> Option<Instant> {
-            None
-        }
-        fn get_last_disconnection(&self) -> Option<Instant> {
-            None
-        }
-    }
 
     #[test]
     fn test_registered_device_factory_no_factory() {
@@ -108,7 +74,6 @@ mod test {
         registry.register_device("MockDevice".to_string(), Box::new(MockDeviceFactory));
 
         let factories = registry.list_factories();
-        assert_eq!(1, factories.len());
-        assert_eq!("MockDevice", factories[0]);
+        assert_eq!(vec!["MockDevice"], factories);
     }
 }
