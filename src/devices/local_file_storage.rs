@@ -1,4 +1,4 @@
-use crate::adapters::primary_device::PrimaryDevice;
+use crate::adapters::primary_device::GlobalConfigProvider;
 use directories::ProjectDirs;
 use std::path::{Path, PathBuf};
 
@@ -26,7 +26,7 @@ impl<'a> LocalFileStorage<'a> {
     }
 }
 
-impl<'a> PrimaryDevice for LocalFileStorage<'a> {
+impl<'a> GlobalConfigProvider for LocalFileStorage<'a> {
     fn init_global_config_dir(&self) -> Result<(), String> {
         if !self.config_dir.exists() {
             self.file_system
@@ -49,18 +49,6 @@ impl<'a> PrimaryDevice for LocalFileStorage<'a> {
 
         self.file_system
             .read_file(self.config_dir.join("config.toml"))
-    }
-
-    fn create_file(&self, file_path: PathBuf) -> Result<(), String> {
-        unimplemented!()
-    }
-
-    fn read_file(&self, file_path: PathBuf) -> Result<String, String> {
-        unimplemented!()
-    }
-
-    fn write_file(&self, file_path: PathBuf, content: &str) -> Result<(), String> {
-        unimplemented!()
     }
 }
 
@@ -101,7 +89,7 @@ mod tests {
     use std::path::{Path, PathBuf};
 
     use crate::{
-        adapters::primary_device::PrimaryDevice,
+        adapters::primary_device::GlobalConfigProvider,
         devices::local_file_storage::{LocalFileStorage, StandardFileSystem},
     };
 

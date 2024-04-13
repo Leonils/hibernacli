@@ -1,8 +1,11 @@
 use std::path::PathBuf;
 
-pub trait PrimaryDevice {
+pub trait GlobalConfigProvider {
     fn init_global_config_dir(&self) -> Result<(), String>;
     fn read_global_config_dir(&self) -> Result<String, String>;
+}
+
+pub trait PrimaryDeviceFilesProvider {
     fn create_file(&self, file_path: PathBuf) -> Result<(), String>;
     fn read_file(&self, file_path: PathBuf) -> Result<String, String>;
     fn write_file(&self, file_path: PathBuf, content: &str) -> Result<(), String>;
