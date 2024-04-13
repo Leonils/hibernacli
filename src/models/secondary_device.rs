@@ -29,7 +29,7 @@ pub trait Device {
 }
 
 pub trait DeviceFactory {
-    fn get_question(&self) -> Question;
+    fn get_question(&mut self) -> Question;
     fn has_next(&self) -> bool;
     fn build(&self) -> Box<dyn Device>;
 }

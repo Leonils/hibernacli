@@ -2,7 +2,7 @@ use std::{path::PathBuf, time::Instant};
 
 use crate::models::{
     backup_requirement::SecurityLevel,
-    question::Question,
+    question::{Question, QuestionType},
     secondary_device::{Device, DeviceFactory},
 };
 
@@ -45,12 +45,25 @@ struct MountedFolderFactory {
 }
 
 impl DeviceFactory for MountedFolderFactory {
-    fn get_question(&self) -> Question {
-        todo!()
+    fn get_question(&mut self) -> Question {
+        let question = match self.step {
+            0 => Question::new(
+                "What is the path of the folder?".to_string(),
+                QuestionType::UnixPath,
+            ),
+            1 => Question::new(
+                "How would you name this device?".to_string(),
+                QuestionType::String,
+            ),
+            _ => panic!("No more questions"),
+        };
+
+        self.step += 1;
+        question
     }
 
     fn has_next(&self) -> bool {
-        todo!()
+        self.step < 2
     }
 
     fn build(&self) -> Box<dyn Device> {
@@ -63,7 +76,33 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_create_mounted_folder() {
-        let factory = MountedFolderFactory::default();
+    fn when_getting_questions_step_increment_and_question_change() {
+        let mut factory = MountedFolderFactory::default();
+
+        assert!(factory.has_next());
+        assert_eq!(
+            factory.get_question().get_statement(),
+            "What is the path of the folder?"
+        );
+        assert_eq!(factory.step, 1);
+
+        assert!(factory.has_next());
+        assert_eq!(
+            factory.get_question().get_statement(),
+            "How would you name this device?"
+        );
+        assert_eq!(factory.step, 2);
+
+        assert!(!factory.has_next());
+    }
+
+    #[test]
+    #[should_panic]
+    fn when_answering_too_many_questions_it_shall_panic() {
+        let mut factory = MountedFolderFactory::default();
+
+        factory.get_question();
+        factory.get_question();
+        factory.get_question();
     }
 }

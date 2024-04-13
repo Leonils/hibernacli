@@ -8,7 +8,7 @@ use crate::models::{
 
 pub struct MockDeviceFactory;
 impl DeviceFactory for MockDeviceFactory {
-    fn get_question(&self) -> Question {
+    fn get_question(&mut self) -> Question {
         panic!("No question")
     }
     fn has_next(&self) -> bool {
