@@ -12,7 +12,6 @@ mod core {
 // Public structures (low behavior, high data)
 mod models {
     mod backup_requirement;
-    pub mod primary_device;
     pub mod project;
     pub mod question;
     pub mod secondary_device;
@@ -21,12 +20,12 @@ mod models {
 // Adapters (interfaces implemented by core)
 mod adapters {
     mod operations;
-    mod primary_device;
+    pub mod primary_device;
     mod secondary_device;
 }
 
 mod devices {
-    mod local_unix_file_storage;
+    mod local_file_storage;
 }
 
 pub mod cli;
