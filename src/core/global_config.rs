@@ -24,6 +24,10 @@ impl DeviceFactoryRegistry {
     fn get_device_factory(&self, device_factory_key: &str) -> Option<&Box<dyn DeviceFactory>> {
         self.devices.get(device_factory_key)
     }
+
+    fn list_factories(&self) -> Vec<String> {
+        self.devices.keys().cloned().collect()
+    }
 }
 
 #[cfg(test)]
@@ -89,5 +93,22 @@ mod test {
         let device_factory = device_factory.unwrap();
         let device = device_factory.build();
         assert_eq!(device.get_name(), "MockDevice");
+    }
+
+    #[test]
+    fn when_listing_factories_with_empty_registry_we_shall_get_empty() {
+        let registry = DeviceFactoryRegistry::new();
+        let factories = registry.list_factories();
+        assert_eq!(0, factories.len());
+    }
+
+    #[test]
+    fn when_listing_factories_with_one_registered_factory_we_shall_get_one() {
+        let mut registry = DeviceFactoryRegistry::new();
+        registry.register_device("MockDevice".to_string(), Box::new(MockDeviceFactory));
+
+        let factories = registry.list_factories();
+        assert_eq!(1, factories.len());
+        assert_eq!("MockDevice", factories[0]);
     }
 }
