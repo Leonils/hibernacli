@@ -13,6 +13,9 @@ struct MountedFolder {
 
 impl Device for MountedFolder {
     fn get_name(&self) -> String {
+        if let Some(name) = &self.name {
+            return name.clone();
+        }
         format!("MountedFolder[{}]", self.path.display())
     }
 
@@ -93,7 +96,13 @@ impl DeviceFactory for MountedFolderFactory {
     }
 
     fn build(&self) -> Result<Box<dyn Device>, String> {
-        todo!()
+        let path = self.path_question.get_answer()?;
+        let name = self.name_question.get_answer()?;
+        let name = if name.is_empty() { None } else { Some(name) };
+        Ok(Box::new(MountedFolder {
+            name,
+            path: PathBuf::from(path),
+        }))
     }
 }
 
@@ -164,6 +173,20 @@ mod test {
 
         let device = factory.build().unwrap();
         assert_eq!(device.get_name(), "MyUsbKey");
+        assert_eq!(device.get_location(), "/media/user/0000-0000");
+    }
+
+    #[test]
+    fn when_answering_questions_but_not_name_default_name_is_used() {
+        let mut factory = MountedFolderFactory::new();
+
+        factory
+            .set_question_answer("/media/user/0000-0000".to_string())
+            .unwrap();
+        factory.set_question_answer("".to_string()).unwrap();
+
+        let device = factory.build().unwrap();
+        assert_eq!(device.get_name(), "MountedFolder[/media/user/0000-0000]");
         assert_eq!(device.get_location(), "/media/user/0000-0000");
     }
 }
