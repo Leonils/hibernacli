@@ -47,7 +47,7 @@ struct MountedFolderFactory {
 }
 
 impl MountedFolderFactory {
-    fn new() -> MountedFolderFactory {
+    pub fn new() -> MountedFolderFactory {
         MountedFolderFactory {
             path_question: Question::new(
                 "What is the path of the folder?".to_string(),
@@ -116,7 +116,7 @@ mod test {
 
     #[test]
     fn i_should_be_able_to_get_first_questions_with_its_type() {
-        let mut factory = MountedFolderFactory::new();
+        let factory = MountedFolderFactory::new();
 
         assert!(factory.has_next());
         assert_eq!(
