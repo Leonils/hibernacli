@@ -8,14 +8,20 @@ use crate::models::{
 
 pub struct MockDeviceFactory;
 impl DeviceFactory for MockDeviceFactory {
-    fn get_question(&mut self) -> Question {
+    fn get_question_statement(&self) -> &str {
+        panic!("No question")
+    }
+    fn get_question_type(&self) -> &crate::models::question::QuestionType {
+        panic!("No question")
+    }
+    fn set_question_answer(&mut self, _answer: String) -> Result<(), String> {
         panic!("No question")
     }
     fn has_next(&self) -> bool {
         false
     }
-    fn build(&self) -> Box<dyn Device> {
-        Box::new(MockDevice)
+    fn build(&self) -> Result<Box<dyn Device>, String> {
+        Ok(Box::new(MockDevice))
     }
 }
 

@@ -77,7 +77,7 @@ mod test {
 
         let device_factory = device_factory.unwrap();
         let device = device_factory.build();
-        assert_eq!(device.get_name(), "MockDevice");
+        assert_eq!(device.unwrap().get_name(), "MockDevice");
     }
 
     #[test]
