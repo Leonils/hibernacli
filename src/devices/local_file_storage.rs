@@ -5,12 +5,14 @@ use std::path::{Path, PathBuf};
 struct LocalFileStorage<'a> {
     config_dir: Box<Path>,
     file_system: &'a dyn FileSystem,
+    default_config: &'a str,
 }
 
 impl<'a> LocalFileStorage<'a> {
     pub fn new(
         path_provider: &impl PathProvider,
         file_system: &'a dyn FileSystem,
+        default_config: &'a str,
     ) -> LocalFileStorage<'a> {
         let config_dir = path_provider
             .get_config_dir("hibernacli")
@@ -19,12 +21,13 @@ impl<'a> LocalFileStorage<'a> {
         LocalFileStorage {
             config_dir,
             file_system,
+            default_config,
         }
     }
 }
 
 impl<'a> PrimaryDevice for LocalFileStorage<'a> {
-    fn init_global_config_dir(&self, toml_config: &str) -> Result<(), String> {
+    fn init_global_config_dir(&self) -> Result<(), String> {
         if !self.config_dir.exists() {
             self.file_system
                 .create_dir_all(self.config_dir.to_owned().into_path_buf())?;
@@ -32,14 +35,20 @@ impl<'a> PrimaryDevice for LocalFileStorage<'a> {
 
         let config_path = self.config_dir.join("config.toml");
         if !config_path.exists() {
-            self.file_system.write_file(config_path, toml_config)?;
+            self.file_system
+                .write_file(config_path, &self.default_config)?;
         }
 
         Ok(())
     }
 
     fn read_global_config_dir(&self) -> Result<String, String> {
-        unimplemented!()
+        self.init_global_config_dir().map_err(|_| {
+            "Config file was missing and an error occurred while creating it.".to_string()
+        })?;
+
+        self.file_system
+            .read_file(self.config_dir.join("config.toml"))
     }
 
     fn create_file(&self, file_path: PathBuf) -> Result<(), String> {
@@ -69,6 +78,7 @@ impl PathProvider for StandardPathProvider {
 
 trait FileSystem {
     fn write_file(&self, file_path: PathBuf, content: &str) -> Result<(), String>;
+    fn read_file(&self, _file_path: PathBuf) -> Result<String, String>;
     fn create_dir_all(&self, dir_path: PathBuf) -> Result<(), String>;
 }
 
@@ -76,6 +86,9 @@ struct StandardFileSystem;
 impl FileSystem for StandardFileSystem {
     fn write_file(&self, file_path: PathBuf, content: &str) -> Result<(), String> {
         std::fs::write(file_path, content).map_err(|e| e.to_string())
+    }
+    fn read_file(&self, file_path: PathBuf) -> Result<String, String> {
+        std::fs::read_to_string(file_path).map_err(|e| e.to_string())
     }
     fn create_dir_all(&self, dir_path: PathBuf) -> Result<(), String> {
         std::fs::create_dir_all(dir_path).map_err(|e| e.to_string())
@@ -125,8 +138,9 @@ mod tests {
         std::fs::write(&config_path, "previous-content").unwrap();
 
         // act
-        let local_unix_file_storage = LocalFileStorage::new(&mock_path_provider, &file_system);
-        let res = local_unix_file_storage.init_global_config_dir("test");
+        let local_unix_file_storage =
+            LocalFileStorage::new(&mock_path_provider, &file_system, "test");
+        let res = local_unix_file_storage.init_global_config_dir();
 
         // assert
         assert_eq!(res, Ok(()));
@@ -146,8 +160,9 @@ mod tests {
         std::fs::create_dir_all(&config_dir).unwrap();
 
         // act
-        let local_unix_file_storage = LocalFileStorage::new(&mock_path_provider, &file_system);
-        let res = local_unix_file_storage.init_global_config_dir("test");
+        let local_unix_file_storage =
+            LocalFileStorage::new(&mock_path_provider, &file_system, "test");
+        let res = local_unix_file_storage.init_global_config_dir();
 
         // assert
         let config_path = config_dir.join("config.toml");
@@ -163,8 +178,9 @@ mod tests {
         let file_system = StandardFileSystem {};
 
         // act
-        let local_unix_file_storage = LocalFileStorage::new(&mock_path_provider, &file_system);
-        let res = local_unix_file_storage.init_global_config_dir("test");
+        let local_unix_file_storage =
+            LocalFileStorage::new(&mock_path_provider, &file_system, "test");
+        let res = local_unix_file_storage.init_global_config_dir();
 
         // assert
         let config_path = mock_path_provider
@@ -188,11 +204,14 @@ mod tests {
     fn when_the_config_dir_cannot_be_retrieved_it_should_panic() {
         let failing_path_provider = FailingPathProvider;
         let file_system = StandardFileSystem;
-        LocalFileStorage::new(&failing_path_provider, &file_system);
+        LocalFileStorage::new(&failing_path_provider, &file_system, "test");
     }
 
     struct FailingWriteFileSystem;
     impl super::FileSystem for FailingWriteFileSystem {
+        fn read_file(&self, _file_path: PathBuf) -> Result<String, String> {
+            Ok("".to_string())
+        }
         fn write_file(&self, _file_path: PathBuf, _content: &str) -> Result<(), String> {
             Err("Could not write file".to_string())
         }
@@ -208,8 +227,9 @@ mod tests {
         let file_system = FailingWriteFileSystem;
 
         // act
-        let local_unix_file_storage = LocalFileStorage::new(&mock_path_provider, &file_system);
-        let res = local_unix_file_storage.init_global_config_dir("test");
+        let local_unix_file_storage =
+            LocalFileStorage::new(&mock_path_provider, &file_system, "test");
+        let res = local_unix_file_storage.init_global_config_dir();
 
         // assert
         assert_eq!(res, Err("Could not write file".to_string()));
@@ -217,6 +237,9 @@ mod tests {
 
     struct FailingCreateDirFileSystem;
     impl super::FileSystem for FailingCreateDirFileSystem {
+        fn read_file(&self, _file_path: PathBuf) -> Result<String, String> {
+            Ok("".to_string())
+        }
         fn write_file(&self, _file_path: PathBuf, _content: &str) -> Result<(), String> {
             Ok(())
         }
@@ -232,10 +255,63 @@ mod tests {
         let file_system = FailingCreateDirFileSystem;
 
         // act
-        let local_unix_file_storage = LocalFileStorage::new(&mock_path_provider, &file_system);
-        let res = local_unix_file_storage.init_global_config_dir("test");
+        let local_unix_file_storage =
+            LocalFileStorage::new(&mock_path_provider, &file_system, "config");
+        let res = local_unix_file_storage.init_global_config_dir();
 
         // assert
         assert_eq!(res, Err("Could not create dir".to_string()));
+    }
+
+    #[test]
+    fn when_the_config_file_exists_it_should_read_it() {
+        // arrange
+        let mock_path_provider = TmpLinuxPathProvider::new();
+        let file_system = StandardFileSystem {};
+        let config_dir = mock_path_provider.get_tmp_path().join("hibernacli");
+        std::fs::create_dir_all(&config_dir).unwrap();
+        let config_path = config_dir.join("config.toml");
+        std::fs::write(&config_path, "previous-content").unwrap();
+
+        // act
+        let local_unix_file_storage =
+            LocalFileStorage::new(&mock_path_provider, &file_system, "config");
+        let res = local_unix_file_storage.read_global_config_dir();
+
+        // assert
+        assert_eq!(res, Ok("previous-content".to_string()));
+    }
+
+    #[test]
+    fn when_the_config_file_does_not_exist_it_should_create_it_with_default_content() {
+        // arrange
+        let mock_path_provider = TmpLinuxPathProvider::new();
+        let file_system = StandardFileSystem {};
+
+        // act
+        let local_unix_file_storage =
+            LocalFileStorage::new(&mock_path_provider, &file_system, "config");
+        let res = local_unix_file_storage.read_global_config_dir();
+
+        // assert
+        assert_eq!(res, Ok("config".to_string()));
+    }
+
+    #[test]
+    fn when_the_config_file_is_missing_and_fail_to_be_created_error_shall_be_explained() {
+        // arrange
+        let mock_path_provider = TmpLinuxPathProvider::new();
+        let file_system = FailingWriteFileSystem;
+
+        // act
+        let local_unix_file_storage =
+            LocalFileStorage::new(&mock_path_provider, &file_system, "config");
+        let res = local_unix_file_storage.read_global_config_dir();
+
+        // assert
+        assert_eq!(
+            res,
+            Err("Config file was missing and an error occurred while creating it.".to_string())
+        );
     }
 }
