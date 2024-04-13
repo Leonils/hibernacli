@@ -96,6 +96,10 @@ impl DeviceFactory for MountedFolderFactory {
     }
 
     fn build(&self) -> Result<Box<dyn Device>, String> {
+        if self.step < 2 {
+            return Err("Not all questions have been answered".to_string());
+        }
+
         let path = self.path_question.get_answer()?;
         let name = self.name_question.get_answer()?;
         let name = if name.is_empty() { None } else { Some(name) };
@@ -188,5 +192,15 @@ mod test {
         let device = factory.build().unwrap();
         assert_eq!(device.get_name(), "MountedFolder[/media/user/0000-0000]");
         assert_eq!(device.get_location(), "/media/user/0000-0000");
+    }
+
+    #[test]
+    fn when_not_all_questions_have_been_answered_error_is_returned() {
+        let factory = MountedFolderFactory::new();
+        let device = factory.build();
+        assert_eq!(
+            "Not all questions have been answered",
+            device.err().unwrap()
+        );
     }
 }
