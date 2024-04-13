@@ -175,4 +175,67 @@ mod tests {
         assert_eq!(config_path.exists(), true);
         assert_eq!(std::fs::read_to_string(config_path).unwrap(), "test");
     }
+
+    struct FailingPathProvider;
+    impl PathProvider for FailingPathProvider {
+        fn get_config_dir(&self, _project_name: &str) -> Option<Box<Path>> {
+            None
+        }
+    }
+
+    #[test]
+    #[should_panic]
+    fn when_the_config_dir_cannot_be_retrieved_it_should_panic() {
+        let failing_path_provider = FailingPathProvider;
+        let file_system = StandardFileSystem;
+        LocalFileStorage::new(&failing_path_provider, &file_system);
+    }
+
+    struct FailingWriteFileSystem;
+    impl super::FileSystem for FailingWriteFileSystem {
+        fn write_file(&self, _file_path: PathBuf, _content: &str) -> Result<(), String> {
+            Err("Could not write file".to_string())
+        }
+        fn create_dir_all(&self, _dir_path: PathBuf) -> Result<(), String> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn when_the_file_cannot_be_written_it_should_return_an_error() {
+        // arrange
+        let mock_path_provider = TmpLinuxPathProvider::new();
+        let file_system = FailingWriteFileSystem;
+
+        // act
+        let local_unix_file_storage = LocalFileStorage::new(&mock_path_provider, &file_system);
+        let res = local_unix_file_storage.init_global_config_dir("test");
+
+        // assert
+        assert_eq!(res, Err("Could not write file".to_string()));
+    }
+
+    struct FailingCreateDirFileSystem;
+    impl super::FileSystem for FailingCreateDirFileSystem {
+        fn write_file(&self, _file_path: PathBuf, _content: &str) -> Result<(), String> {
+            Ok(())
+        }
+        fn create_dir_all(&self, _dir_path: PathBuf) -> Result<(), String> {
+            Err("Could not create dir".to_string())
+        }
+    }
+
+    #[test]
+    fn when_the_dir_cannot_be_created_it_should_return_an_error() {
+        // arrange
+        let mock_path_provider = TmpLinuxPathProvider::new();
+        let file_system = FailingCreateDirFileSystem;
+
+        // act
+        let local_unix_file_storage = LocalFileStorage::new(&mock_path_provider, &file_system);
+        let res = local_unix_file_storage.init_global_config_dir("test");
+
+        // assert
+        assert_eq!(res, Err("Could not create dir".to_string()));
+    }
 }
