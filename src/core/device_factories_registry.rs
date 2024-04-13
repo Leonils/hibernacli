@@ -2,18 +2,18 @@ use std::collections::HashMap;
 
 use crate::models::secondary_device::DeviceFactory;
 
-struct DeviceFactoryRegistry {
+pub struct DeviceFactoryRegistry {
     devices: HashMap<String, Box<dyn DeviceFactory>>,
 }
 
 impl DeviceFactoryRegistry {
-    fn new() -> Self {
+    pub fn new() -> Self {
         DeviceFactoryRegistry {
             devices: HashMap::new(),
         }
     }
 
-    fn register_device(
+    pub fn register_device(
         &mut self,
         device_factory_key: String,
         device_factory: Box<dyn DeviceFactory>,
@@ -21,11 +21,11 @@ impl DeviceFactoryRegistry {
         self.devices.insert(device_factory_key, device_factory);
     }
 
-    fn get_device_factory(&self, device_factory_key: &str) -> Option<&Box<dyn DeviceFactory>> {
+    pub fn get_device_factory(&self, device_factory_key: &str) -> Option<&Box<dyn DeviceFactory>> {
         self.devices.get(device_factory_key)
     }
 
-    fn list_factories(&self) -> Vec<String> {
+    pub fn list_factories(&self) -> Vec<String> {
         self.devices.keys().cloned().collect()
     }
 }
