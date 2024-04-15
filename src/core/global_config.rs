@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use toml::Table;
 
 use crate::{adapters::primary_device::GlobalConfigProvider, models::secondary_device::Device};
@@ -23,17 +24,36 @@ impl GlobalConfig {
         let parsed_config: PartiallyParsedGlobalConfig =
             toml::from_str(&config_toml).map_err(|e| e.to_string())?;
 
-        let devices = parsed_config
+        let (errors, devices): (Vec<_>, Vec<_>) = parsed_config
             .devices
             .unwrap_or(vec![])
-            .iter()
-            .map(|device_table| {
-                device_factories_registry
-                    .get_device_factory(device_table["type"].as_str().unwrap())
-                    .ok_or_else(|| "Device factory not found".to_string())
-                    .and_then(|device_factory| device_factory.build_from_toml_table(device_table))
+            .into_iter()
+            .map(|device_table| -> Result<Box<dyn Device>, String> {
+                let name = device_table
+                    .get("name")
+                    .ok_or_else(|| "Missing name for device".to_string())?
+                    .as_str()
+                    .ok_or_else(|| "Invalid string for name".to_string())?;
+
+                let device_type: &str = device_table
+                    .get("type")
+                    .ok_or_else(|| "Type not found".to_string())?
+                    .as_str()
+                    .ok_or_else(|| "Invalid string for type".to_string())?;
+
+                let factory = device_factories_registry
+                    .get_device_factory(device_type)
+                    .ok_or_else(|| "Device factory not found".to_string())?;
+
+                let device = factory.build_from_toml_table(&device_table)?;
+                Ok(device)
             })
-            .collect::<Result<Vec<Box<dyn Device>>, String>>()?;
+            .into_iter()
+            .partition_map(From::from);
+
+        if !errors.is_empty() {
+            return Err(errors.iter().join(", "));
+        }
 
         Ok(GlobalConfig { devices })
     }
@@ -149,5 +169,40 @@ type = "UnknownDevice"
         let config = GlobalConfig::load(config_provider, device_factories_registry);
         assert!(config.is_err());
         assert_eq!(config.err().unwrap(), "Device factory not found");
+    }
+
+    #[test]
+    fn if_name_is_missing_it_shall_fail() {
+        let device_factories_registry = get_mock_device_factory_registry();
+        let config_provider = MockGlobalConfigProvider::new(
+            r#"
+[[devices]]
+type = "MockDevice"
+"#,
+        );
+        let config = GlobalConfig::load(config_provider, device_factories_registry);
+        assert!(config.is_err());
+        assert_eq!(config.err().unwrap(), "Missing name for device");
+    }
+
+    #[test]
+    fn if_multiple_errors_in_device_it_shall_return_first_error_of_each_device() {
+        let device_factories_registry = get_mock_device_factory_registry();
+        let config_provider = MockGlobalConfigProvider::new(
+            r#"
+[[devices]]
+type = "MockDevice"
+
+[[devices]]
+name = "MyPersonalDevice"
+type = "UnknownDevice"
+"#,
+        );
+        let config = GlobalConfig::load(config_provider, device_factories_registry);
+        assert!(config.is_err());
+        assert_eq!(
+            config.err().unwrap(),
+            "Missing name for device, Device factory not found"
+        );
     }
 }
