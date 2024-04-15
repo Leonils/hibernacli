@@ -38,6 +38,24 @@ impl GlobalConfig {
             return Err(errors.iter().join(", "));
         }
 
+        let device_count_by_name = devices
+            .iter()
+            .map(|device| device.get_name())
+            .fold(std::collections::HashMap::new(), |mut acc, name| {
+                *acc.entry(name).or_insert(0) += 1;
+                acc
+            })
+            .into_iter()
+            .filter(|(_, count)| *count > 1)
+            .collect::<Vec<_>>();
+
+        if !device_count_by_name.is_empty() {
+            return Err(format!(
+                "Duplicate device found in configuration file: {}",
+                device_count_by_name.iter().map(|(name, _)| name).join(", ")
+            ));
+        }
+
         Ok(GlobalConfig { devices })
     }
 
@@ -258,5 +276,57 @@ type = "MockDeviceWithParameters"
         let config = GlobalConfig::load(config_provider, registry);
         assert!(config.is_err());
         assert_eq!(config.err().unwrap(), "Missing parameter");
+    }
+
+    #[test]
+    fn when_loading_configuration_if_there_is_2_devices_of_same_name_there_should_be_an_error() {
+        let registry = get_mock_device_factory_registry();
+        let config_provider = MockGlobalConfigProvider::new(
+            r#"
+[[devices]]
+name = "MyPersonalDevice"
+type = "MockDevice"
+
+[[devices]]
+name = "MyPersonalDevice"
+type = "MockDevice"
+"#,
+        );
+        let config = GlobalConfig::load(config_provider, registry);
+        assert!(config.is_err());
+        assert_eq!(
+            config.err().unwrap(),
+            "Duplicate device found in configuration file: MyPersonalDevice"
+        );
+    }
+
+    #[test]
+    fn when_loading_configuration_if_there_is_4_devices_of_same_name_there_should_be_an_error() {
+        let registry = get_mock_device_factory_registry();
+        let config_provider = MockGlobalConfigProvider::new(
+            r#"
+[[devices]]
+name = "MyPersonalDevice"
+type = "MockDevice"
+
+[[devices]]
+name = "MyPersonalDevice"
+type = "MockDevice"
+
+[[devices]]
+name = "MyOtherDevice"
+type = "MockDevice"
+
+[[devices]]
+name = "MyOtherDevice"
+type = "MockDevice"
+"#,
+        );
+        let config = GlobalConfig::load(config_provider, registry);
+        assert!(config.is_err());
+        assert_eq!(
+            config.err().unwrap(),
+            "Duplicate device found in configuration file: MyPersonalDevice, MyOtherDevice"
+        );
     }
 }
