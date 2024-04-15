@@ -117,4 +117,26 @@ type = "MockDevice"
         assert_eq!(config.devices[0].get_device_type_name(), "MockDevice");
         assert_eq!(config.devices[0].get_name(), "MyPersonalDevice");
     }
+
+    #[test]
+    fn when_retrieving_config_with_multiple_devices_it_shall_have_all_devices_in_global_config() {
+        let device_factories_registry = get_mock_device_factory_registry();
+        let config_provider = MockGlobalConfigProvider::new(
+            r#"
+[[devices]]
+name = "MyPersonalDevice"
+type = "MockDevice"
+
+[[devices]]
+name = "MySecondPersonalDevice"
+type = "MockDevice"
+"#,
+        );
+        let config = GlobalConfig::load(config_provider, device_factories_registry).unwrap();
+        assert_eq!(config.devices.len(), 2);
+        assert_eq!(config.devices[0].get_device_type_name(), "MockDevice");
+        assert_eq!(config.devices[0].get_name(), "MyPersonalDevice");
+        assert_eq!(config.devices[1].get_device_type_name(), "MockDevice");
+        assert_eq!(config.devices[1].get_name(), "MySecondPersonalDevice");
+    }
 }
