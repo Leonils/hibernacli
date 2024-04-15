@@ -23,14 +23,23 @@ impl DeviceFactory for MockDeviceFactory {
         false
     }
     fn build(&self) -> Result<Box<dyn Device>, String> {
-        Ok(Box::new(MockDevice))
+        Ok(Box::new(MockDevice {
+            name: "MockDevice".to_string(),
+        }))
+    }
+    fn build_from_toml_table(&self, table: &toml::value::Table) -> Result<Box<dyn Device>, String> {
+        Ok(Box::new(MockDevice {
+            name: table["name"].as_str().unwrap().to_string(),
+        }))
     }
 }
 
-pub struct MockDevice;
+pub struct MockDevice {
+    pub name: String,
+}
 impl Device for MockDevice {
     fn get_name(&self) -> String {
-        "MockDevice".to_string()
+        self.name.clone()
     }
     fn get_location(&self) -> String {
         "Home".to_string()
