@@ -29,24 +29,7 @@ impl GlobalConfig {
             .unwrap_or(vec![])
             .into_iter()
             .map(|device_table| -> Result<Box<dyn Device>, String> {
-                let name = device_table
-                    .get("name")
-                    .ok_or_else(|| "Missing name for device".to_string())?
-                    .as_str()
-                    .ok_or_else(|| "Invalid string for name".to_string())?;
-
-                let device_type: &str = device_table
-                    .get("type")
-                    .ok_or_else(|| "Type not found".to_string())?
-                    .as_str()
-                    .ok_or_else(|| "Invalid string for type".to_string())?;
-
-                let factory = device_factories_registry
-                    .get_device_factory(device_type)
-                    .ok_or_else(|| "Device factory not found".to_string())?;
-
-                let device = factory.build_from_toml_table(&name, &device_table)?;
-                Ok(device)
+                Self::load_device_from_toml_bloc(device_table, &device_factories_registry)
             })
             .into_iter()
             .partition_map(From::from);
@@ -57,13 +40,39 @@ impl GlobalConfig {
 
         Ok(GlobalConfig { devices })
     }
+
+    fn load_device_from_toml_bloc(
+        device_table: toml::map::Map<String, toml::Value>,
+        device_factories_registry: &DeviceFactoryRegistry,
+    ) -> Result<Box<dyn Device>, String> {
+        let name = device_table
+            .get("name")
+            .ok_or_else(|| "Missing name for device".to_string())?
+            .as_str()
+            .ok_or_else(|| "Invalid string for name".to_string())?;
+
+        let device_type: &str = device_table
+            .get("type")
+            .ok_or_else(|| "Type not found".to_string())?
+            .as_str()
+            .ok_or_else(|| "Invalid string for type".to_string())?;
+
+        let factory = device_factories_registry
+            .get_device_factory(device_type)
+            .ok_or_else(|| "Device factory not found".to_string())?;
+
+        let device = factory.build_from_toml_table(&name, &device_table)?;
+        Ok(device)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::core::{
         device_factories_registry::{self, DeviceFactoryRegistry},
-        test_utils::mocks::{MockDeviceFactory, MockGlobalConfigProvider},
+        test_utils::mocks::{
+            MockDeviceFactory, MockDeviceWithParametersFactory, MockGlobalConfigProvider,
+        },
     };
 
     use super::GlobalConfig;
@@ -74,6 +83,11 @@ mod tests {
             "MockDevice".to_string(),
             "MockDevice".to_string(),
             Box::new(MockDeviceFactory),
+        );
+        registry.register_device(
+            "MockDeviceWithParameters".to_string(),
+            "MockDeviceWithParameters".to_string(),
+            Box::new(MockDeviceWithParametersFactory),
         );
         registry
     }
@@ -204,5 +218,45 @@ type = "UnknownDevice"
             config.err().unwrap(),
             "Missing name for device, Device factory not found"
         );
+    }
+
+    #[test]
+    fn when_there_are_multiple_device_types_each_device_type_shall_be_parsed() {
+        let registry = get_mock_device_factory_registry();
+        let config_provider = MockGlobalConfigProvider::new(
+            r#"
+[[devices]]
+name = "MyPersonalDevice"
+type = "MockDevice"
+
+[[devices]]
+name = "MySecondPersonalDevice"
+type = "MockDeviceWithParameters"
+parameter = "MyParameter"
+"#,
+        );
+        let config = GlobalConfig::load(config_provider, registry).unwrap();
+        assert_eq!(config.devices.len(), 2);
+        assert_eq!(config.devices[0].get_device_type_name(), "MockDevice");
+        assert_eq!(config.devices[0].get_name(), "MyPersonalDevice");
+        assert_eq!(
+            config.devices[1].get_device_type_name(),
+            "MockDeviceWithParameters"
+        );
+        assert_eq!(config.devices[1].get_name(), "MySecondPersonalDevice");
+    }
+    #[test]
+    fn when_a_type_with_additional_parameters_has_a_missing_parameter_it_should_propagate_error() {
+        let registry = get_mock_device_factory_registry();
+        let config_provider = MockGlobalConfigProvider::new(
+            r#"
+[[devices]]
+name = "MySecondPersonalDevice"
+type = "MockDeviceWithParameters"
+"#,
+        );
+        let config = GlobalConfig::load(config_provider, registry);
+        assert!(config.is_err());
+        assert_eq!(config.err().unwrap(), "Missing parameter");
     }
 }

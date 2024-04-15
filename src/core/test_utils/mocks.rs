@@ -38,6 +38,64 @@ impl DeviceFactory for MockDeviceFactory {
     }
 }
 
+pub struct MockDeviceWithParametersFactory;
+pub struct MockDeviceWithParameters {
+    pub name: String,
+    pub parameter: String,
+}
+impl Device for MockDeviceWithParameters {
+    fn get_name(&self) -> String {
+        self.name.clone()
+    }
+    fn get_location(&self) -> String {
+        self.parameter.clone()
+    }
+    fn get_device_type_name(&self) -> String {
+        "MockDeviceWithParameters".to_string()
+    }
+    fn get_last_connection(&self) -> Option<Instant> {
+        None
+    }
+    fn get_last_disconnection(&self) -> Option<Instant> {
+        None
+    }
+    fn get_security_level(&self) -> SecurityLevel {
+        SecurityLevel::Local
+    }
+}
+impl DeviceFactory for MockDeviceWithParametersFactory {
+    fn get_question_statement(&self) -> &str {
+        panic!("No question")
+    }
+    fn get_question_type(&self) -> &crate::models::question::QuestionType {
+        panic!("No question")
+    }
+    fn set_question_answer(&mut self, _answer: String) -> Result<(), String> {
+        panic!("No question")
+    }
+    fn has_next(&self) -> bool {
+        false
+    }
+    fn build(&self) -> Result<Box<dyn Device>, String> {
+        panic!("Mock not implemented for this use case")
+    }
+    fn build_from_toml_table(
+        &self,
+        name: &str,
+        table: &toml::value::Table,
+    ) -> Result<Box<dyn Device>, String> {
+        Ok(Box::new(MockDeviceWithParameters {
+            name: name.to_string(),
+            parameter: table
+                .get("parameter")
+                .ok_or_else(|| "Missing parameter".to_string())?
+                .as_str()
+                .ok_or_else(|| "Invalid string for parameter".to_string())?
+                .to_string(),
+        }))
+    }
+}
+
 pub struct MockDevice {
     pub name: String,
 }
