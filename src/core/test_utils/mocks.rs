@@ -27,9 +27,13 @@ impl DeviceFactory for MockDeviceFactory {
             name: "MockDevice".to_string(),
         }))
     }
-    fn build_from_toml_table(&self, table: &toml::value::Table) -> Result<Box<dyn Device>, String> {
+    fn build_from_toml_table(
+        &self,
+        name: &str,
+        table: &toml::value::Table,
+    ) -> Result<Box<dyn Device>, String> {
         Ok(Box::new(MockDevice {
-            name: table["name"].as_str().unwrap().to_string(),
+            name: name.to_string(),
         }))
     }
 }
