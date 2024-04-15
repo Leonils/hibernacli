@@ -9,6 +9,24 @@ struct GlobalConfig {
     devices: Vec<Box<dyn Device>>,
 }
 
+impl GlobalConfig {
+    fn get_device_by_name(&self, name: &str) -> Option<&Box<dyn Device>> {
+        self.devices.iter().find(|d| d.get_name() == name)
+    }
+
+    pub fn add_device(&mut self, device: Box<dyn Device>) -> Result<(), String> {
+        if self.get_device_by_name(&device.get_name()).is_some() {
+            return Err(format!(
+                "Device with name {} already exists",
+                device.get_name()
+            ));
+        }
+
+        self.devices.push(device);
+        Ok(())
+    }
+}
+
 #[derive(serde::Deserialize, Debug, Default)]
 struct PartiallyParsedGlobalConfig {
     devices: Option<Vec<Table>>,
@@ -96,11 +114,14 @@ impl GlobalConfig {
 
 #[cfg(test)]
 mod tests {
-    use crate::core::{
-        device_factories_registry::{self, DeviceFactoryRegistry},
-        test_utils::mocks::{
-            MockDeviceFactory, MockDeviceWithParametersFactory, MockGlobalConfigProvider,
+    use crate::{
+        core::{
+            device_factories_registry::{self, DeviceFactoryRegistry},
+            test_utils::mocks::{
+                MockDeviceFactory, MockDeviceWithParametersFactory, MockGlobalConfigProvider,
+            },
         },
+        models::secondary_device::DeviceFactory,
     };
 
     use super::GlobalConfig;
@@ -338,5 +359,43 @@ type = "MockDevice"
             config.err().unwrap(),
             "Duplicate device found in configuration file: MyOtherDevice, MyPersonalDevice"
         );
+    }
+
+    #[test]
+    fn when_adding_device_to_global_config_it_shall_add_it() {
+        let mut global_config = GlobalConfig { devices: vec![] };
+
+        let device = MockDeviceFactory
+            .build_from_toml_table("MyPersonalDevice", &toml::Table::new())
+            .unwrap();
+
+        global_config.add_device(device).unwrap();
+        assert_eq!(global_config.devices.len(), 1);
+        assert_eq!(global_config.devices[0].get_name(), "MyPersonalDevice");
+    }
+
+    #[test]
+    fn when_adding_device_to_global_config_if_device_already_exists_it_shall_return_error() {
+        let mut global_config = GlobalConfig { devices: vec![] };
+
+        let device = MockDeviceFactory
+            .build_from_toml_table("MyPersonalDevice", &toml::Table::new())
+            .unwrap();
+
+        let device2 = MockDeviceFactory
+            .build_from_toml_table("MyPersonalDevice", &toml::Table::new())
+            .unwrap();
+
+        let result = global_config.add_device(device);
+        assert!(result.is_ok());
+
+        let result = global_config.add_device(device2);
+        assert!(result.is_err());
+        assert_eq!(
+            result.err().unwrap(),
+            "Device with name MyPersonalDevice already exists"
+        );
+
+        assert_eq!(global_config.devices.len(), 1);
     }
 }
