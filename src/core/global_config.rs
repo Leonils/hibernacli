@@ -23,13 +23,9 @@ impl GlobalConfig {
         let parsed_config: PartiallyParsedGlobalConfig =
             toml::from_str(&config_toml).map_err(|e| e.to_string())?;
 
-        if parsed_config.devices.is_none() {
-            return Ok(GlobalConfig { devices: vec![] });
-        }
-
         let devices = parsed_config
             .devices
-            .unwrap()
+            .unwrap_or(vec![])
             .iter()
             .map(|device_table| {
                 device_factories_registry
@@ -138,5 +134,20 @@ type = "MockDevice"
         assert_eq!(config.devices[0].get_name(), "MyPersonalDevice");
         assert_eq!(config.devices[1].get_device_type_name(), "MockDevice");
         assert_eq!(config.devices[1].get_name(), "MySecondPersonalDevice");
+    }
+
+    #[test]
+    fn if_type_is_not_in_registry_it_shall_return_error() {
+        let device_factories_registry = get_mock_device_factory_registry();
+        let config_provider = MockGlobalConfigProvider::new(
+            r#"
+[[devices]]
+name = "MyPersonalDevice"
+type = "UnknownDevice"
+"#,
+        );
+        let config = GlobalConfig::load(config_provider, device_factories_registry);
+        assert!(config.is_err());
+        assert_eq!(config.err().unwrap(), "Device factory not found");
     }
 }
