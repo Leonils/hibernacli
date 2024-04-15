@@ -21,10 +21,8 @@ impl GlobalConfig {
     ) -> Result<GlobalConfig, String> {
         let config_toml = config_provider.read_global_config_dir()?;
 
-        let parsed_config: PartiallyParsedGlobalConfig =
-            toml::from_str(&config_toml).map_err(|e| e.to_string())?;
-
-        let (errors, devices): (Vec<_>, Vec<_>) = parsed_config
+        let (errors, devices) = toml::from_str::<PartiallyParsedGlobalConfig>(&config_toml)
+            .map_err(|e| e.to_string())?
             .devices
             .unwrap_or(vec![])
             .into_iter()
@@ -34,27 +32,8 @@ impl GlobalConfig {
             .into_iter()
             .partition_map(From::from);
 
-        if !errors.is_empty() {
-            return Err(errors.iter().join(", "));
-        }
-
-        let device_count_by_name = devices
-            .iter()
-            .map(|device| device.get_name())
-            .fold(std::collections::HashMap::new(), |mut acc, name| {
-                *acc.entry(name).or_insert(0) += 1;
-                acc
-            })
-            .into_iter()
-            .filter(|(_, count)| *count > 1)
-            .collect::<Vec<_>>();
-
-        if !device_count_by_name.is_empty() {
-            return Err(format!(
-                "Duplicate device found in configuration file: {}",
-                device_count_by_name.iter().map(|(name, _)| name).join(", ")
-            ));
-        }
+        Self::assert_no_errors_in_devices(&errors)?;
+        Self::assert_no_duplicate_device(&devices)?;
 
         Ok(GlobalConfig { devices })
     }
@@ -81,6 +60,37 @@ impl GlobalConfig {
 
         let device = factory.build_from_toml_table(&name, &device_table)?;
         Ok(device)
+    }
+
+    fn assert_no_errors_in_devices(errors: &Vec<String>) -> Result<(), String> {
+        if !errors.is_empty() {
+            return Err(errors.join(", "));
+        }
+
+        Ok(())
+    }
+
+    fn assert_no_duplicate_device(devices: &Vec<Box<dyn Device>>) -> Result<(), String> {
+        let device_count_by_name = devices
+            .iter()
+            .map(|device| device.get_name())
+            .fold(std::collections::HashMap::new(), |mut acc, name| {
+                *acc.entry(name).or_insert(0) += 1;
+                acc
+            })
+            .into_iter()
+            .filter(|(_, count)| *count > 1)
+            .sorted_by(|(name1, _), (name2, _)| name1.cmp(name2))
+            .collect::<Vec<_>>();
+
+        if !device_count_by_name.is_empty() {
+            return Err(format!(
+                "Duplicate device found in configuration file: {}",
+                device_count_by_name.iter().map(|(name, _)| name).join(", ")
+            ));
+        }
+
+        Ok(())
     }
 }
 
@@ -326,7 +336,7 @@ type = "MockDevice"
         assert!(config.is_err());
         assert_eq!(
             config.err().unwrap(),
-            "Duplicate device found in configuration file: MyPersonalDevice, MyOtherDevice"
+            "Duplicate device found in configuration file: MyOtherDevice, MyPersonalDevice"
         );
     }
 }
