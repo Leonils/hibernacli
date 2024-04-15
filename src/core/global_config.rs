@@ -35,7 +35,7 @@ impl GlobalConfig {
                 device_factories_registry
                     .get_device_factory(device_table["type"].as_str().unwrap())
                     .ok_or_else(|| "Device factory not found".to_string())
-                    .and_then(|device_factory| device_factory.build())
+                    .and_then(|device_factory| device_factory.build_from_toml_table(device_table))
             })
             .collect::<Result<Vec<Box<dyn Device>>, String>>()?;
 
@@ -98,5 +98,23 @@ type = "MockDevice"
         );
         let config = GlobalConfig::load(config_provider, device_factories_registry).unwrap();
         assert_eq!(config.devices.len(), 1);
+        assert_eq!(config.devices[0].get_device_type_name(), "MockDevice");
+        assert_eq!(config.devices[0].get_name(), "MockDevice");
+    }
+
+    #[test]
+    fn when_retrieving_config_with_different_name_it_shall_be_reflected_in_device() {
+        let device_factories_registry = get_mock_device_factory_registry();
+        let config_provider = MockGlobalConfigProvider::new(
+            r#"
+[[devices]]
+name = "MyPersonalDevice"
+type = "MockDevice"
+"#,
+        );
+        let config = GlobalConfig::load(config_provider, device_factories_registry).unwrap();
+        assert_eq!(config.devices.len(), 1);
+        assert_eq!(config.devices[0].get_device_type_name(), "MockDevice");
+        assert_eq!(config.devices[0].get_name(), "MyPersonalDevice");
     }
 }

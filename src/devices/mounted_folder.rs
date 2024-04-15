@@ -108,6 +108,13 @@ impl DeviceFactory for MountedFolderFactory {
             path: PathBuf::from(path),
         }))
     }
+
+    fn build_from_toml_table(
+        &self,
+        _table: &toml::value::Table,
+    ) -> Result<Box<dyn Device>, String> {
+        todo!()
+    }
 }
 
 #[cfg(test)]

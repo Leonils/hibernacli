@@ -37,4 +37,5 @@ pub trait DeviceFactory {
     fn set_question_answer(&mut self, answer: String) -> Result<(), String>;
     fn has_next(&self) -> bool;
     fn build(&self) -> Result<Box<dyn Device>, String>;
+    fn build_from_toml_table(&self, table: &toml::value::Table) -> Result<Box<dyn Device>, String>;
 }
