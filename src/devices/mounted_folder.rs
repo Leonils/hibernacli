@@ -111,10 +111,19 @@ impl DeviceFactory for MountedFolderFactory {
 
     fn build_from_toml_table(
         &self,
-        _name: &str,
-        _table: &toml::value::Table,
+        name: &str,
+        table: &toml::value::Table,
     ) -> Result<Box<dyn Device>, String> {
-        todo!()
+        let path = table
+            .get("path")
+            .ok_or_else(|| "missing field `path`".to_string())?
+            .as_str()
+            .ok_or_else(|| "Invalid string for 'path'".to_string())?;
+
+        Ok(Box::new(MountedFolder {
+            name: Some(name.to_string()),
+            path: PathBuf::from(path),
+        }))
     }
 }
 
@@ -210,5 +219,42 @@ mod test {
             "Not all questions have been answered",
             device.err().unwrap()
         );
+    }
+
+    #[test]
+    fn when_creating_device_from_toml_table_it_shall_have_the_right_name_and_location() {
+        let factory = MountedFolderFactory::new();
+        let mut table = toml::value::Table::new();
+        table.insert(
+            "path".to_string(),
+            toml::Value::String("/media/user/0000-0000".to_string()),
+        );
+        table.insert(
+            "name".to_string(),
+            toml::Value::String("MyUsbKey".to_string()),
+        );
+
+        let device = factory.build_from_toml_table("MyUsbKey", &table).unwrap();
+        assert_eq!(device.get_name(), "MyUsbKey");
+        assert_eq!(device.get_location(), "/media/user/0000-0000");
+    }
+
+    #[test]
+    fn when_creating_device_from_toml_with_no_path_it_shall_return_error() {
+        let factory = MountedFolderFactory::new();
+        let table = toml::value::Table::new();
+
+        let device = factory.build_from_toml_table("MyUsbKey", &table);
+        assert_eq!("missing field `path`", device.err().unwrap());
+    }
+
+    #[test]
+    fn when_creating_device_from_toml_with_invalid_path_it_shall_return_error() {
+        let factory = MountedFolderFactory::new();
+        let mut table = toml::value::Table::new();
+        table.insert("path".to_string(), toml::Value::Integer(42));
+
+        let device = factory.build_from_toml_table("MyUsbKey", &table);
+        assert_eq!("Invalid string for 'path'", device.err().unwrap());
     }
 }
