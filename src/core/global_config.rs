@@ -45,7 +45,7 @@ impl GlobalConfig {
                     .get_device_factory(device_type)
                     .ok_or_else(|| "Device factory not found".to_string())?;
 
-                let device = factory.build_from_toml_table(&device_table)?;
+                let device = factory.build_from_toml_table(&name, &device_table)?;
                 Ok(device)
             })
             .into_iter()

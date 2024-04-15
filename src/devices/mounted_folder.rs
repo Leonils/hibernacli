@@ -111,6 +111,7 @@ impl DeviceFactory for MountedFolderFactory {
 
     fn build_from_toml_table(
         &self,
+        _name: &str,
         _table: &toml::value::Table,
     ) -> Result<Box<dyn Device>, String> {
         todo!()
