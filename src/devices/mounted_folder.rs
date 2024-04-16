@@ -38,6 +38,10 @@ impl Device for MountedFolder {
     fn get_last_disconnection(&self) -> Option<Instant> {
         None
     }
+
+    fn to_toml_table(&self) -> toml::value::Table {
+        panic!("Not implemented")
+    }
 }
 
 struct MountedFolderFactory {

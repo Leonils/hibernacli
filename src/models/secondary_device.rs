@@ -29,6 +29,9 @@ pub trait Device {
 
     // The last time the device was disconnected
     fn get_last_disconnection(&self) -> Option<Instant>;
+
+    // Serialize the device to a TOML table
+    fn to_toml_table(&self) -> toml::value::Table;
 }
 
 pub trait DeviceFactory {

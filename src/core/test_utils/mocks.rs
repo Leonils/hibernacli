@@ -62,6 +62,13 @@ impl Device for MockDeviceWithParameters {
     fn get_security_level(&self) -> SecurityLevel {
         SecurityLevel::Local
     }
+    fn to_toml_table(&self) -> toml::value::Table {
+        let mut table = toml::value::Table::new();
+        table.insert("name".to_string(), self.get_name().into());
+        table.insert("type".to_string(), self.get_device_type_name().into());
+        table.insert("parameter".to_string(), self.parameter.clone().into());
+        table
+    }
 }
 impl DeviceFactory for MockDeviceWithParametersFactory {
     fn get_question_statement(&self) -> &str {
@@ -117,6 +124,12 @@ impl Device for MockDevice {
     }
     fn get_last_disconnection(&self) -> Option<Instant> {
         None
+    }
+    fn to_toml_table(&self) -> toml::value::Table {
+        let mut table = toml::value::Table::new();
+        table.insert("name".to_string(), self.get_name().into());
+        table.insert("type".to_string(), self.get_device_type_name().into());
+        table
     }
 }
 
