@@ -60,7 +60,7 @@ impl GlobalConfig {
         Ok(GlobalConfig { devices })
     }
 
-    pub fn save(&self, config_provider: &impl GlobalConfigProvider) -> Result<(), String> {
+    pub fn save(&self, config_provider: &dyn GlobalConfigProvider) -> Result<(), String> {
         let device_tables = self
             .devices
             .iter()

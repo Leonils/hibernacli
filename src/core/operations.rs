@@ -43,8 +43,15 @@ impl DeviceOperations for Operations {
             .get_device_factory(&device_type)
     }
 
-    fn add_device(&self, device: Box<dyn Device>) -> Result<Box<dyn Device>, Box<dyn Error>> {
-        todo!()
+    fn add_device(&self, device: Box<dyn Device>) -> Result<(), Box<dyn Error>> {
+        let mut config = GlobalConfig::load(
+            self.global_config_provider.as_ref(),
+            &self.device_factory_registry,
+        )?;
+
+        config.add_device(device)?;
+        config.save(self.global_config_provider.as_ref())?;
+        Ok(())
     }
 
     fn remove_by_name(&self) {
@@ -64,9 +71,11 @@ impl DeviceOperations for Operations {
 
 #[cfg(test)]
 mod test {
+    use mockall::predicate::eq;
+
     use crate::{
         adapters::primary_device::MockGlobalConfigProvider,
-        core::test_utils::mocks::{MockDeviceFactory, MockGlobalConfigProviderFactory},
+        core::test_utils::mocks::{MockDevice, MockDeviceFactory, MockGlobalConfigProviderFactory},
     };
 
     use super::*;
@@ -174,5 +183,37 @@ type = "MockDevice"
         assert!(devices.len() == 1);
         assert_eq!(devices[0].get_name(), "MockDevice");
         assert_eq!(devices[0].get_device_type_name(), "MockDevice");
+    }
+
+    #[test]
+    fn when_adding_a_device_to_empty_config_it_shall_add_it_to_the_configuration() {
+        let mut registry = DeviceFactoryRegistry::new();
+        registry.register_device(
+            "MockDevice".to_string(),
+            "Mock Device".to_string(),
+            Box::new(MockDeviceFactory),
+        );
+
+        let mut provider = MockGlobalConfigProvider::new();
+        provider
+            .expect_read_global_config_dir()
+            .return_const(Ok(r#""#.to_string()));
+        provider
+            .expect_write_global_config_dir()
+            .times(1)
+            .with(eq(r#"[[devices]]
+name = "MockDevice"
+type = "MockDevice"
+"#
+            .to_string()))
+            .return_const(Ok(()));
+
+        let operations = Operations {
+            device_factory_registry: registry,
+            global_config_provider: Box::new(provider),
+        };
+
+        let device = Box::new(MockDevice::new("MockDevice"));
+        operations.add_device(device).unwrap();
     }
 }
