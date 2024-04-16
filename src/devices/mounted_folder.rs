@@ -40,7 +40,11 @@ impl Device for MountedFolder {
     }
 
     fn to_toml_table(&self) -> toml::value::Table {
-        panic!("Not implemented")
+        let mut table = toml::value::Table::new();
+        table.insert("type".to_string(), self.get_device_type_name().into());
+        table.insert("path".to_string(), self.path.display().to_string().into());
+        table.insert("name".to_string(), self.get_name().into());
+        table
     }
 }
 
@@ -260,5 +264,23 @@ mod test {
 
         let device = factory.build_from_toml_table("MyUsbKey", &table);
         assert_eq!("Invalid string for 'path'", device.err().unwrap());
+    }
+
+    #[test]
+    fn when_serializing_device_to_toml_with_name_it_shall_have_name_path_and_type() {
+        let device = MountedFolder {
+            name: Some("MyUsbKey".to_string()),
+            path: PathBuf::from("/media/user/0000-0000"),
+        };
+
+        let table = device.to_toml_table();
+        let string_table = toml::to_string(&table).unwrap();
+        assert_eq!(
+            string_table,
+            r#"name = "MyUsbKey"
+path = "/media/user/0000-0000"
+type = "MountedFolder"
+"#
+        );
     }
 }
