@@ -1,5 +1,9 @@
 use std::path::PathBuf;
 
+#[cfg(test)]
+use mockall::automock;
+
+#[cfg_attr(test, automock)]
 pub trait GlobalConfigProvider {
     fn init_global_config_dir(&self) -> Result<(), String>;
     fn read_global_config_dir(&self) -> Result<String, String>;
