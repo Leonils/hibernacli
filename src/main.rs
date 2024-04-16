@@ -1,5 +1,7 @@
 use hibernacli::cli::run;
+use std::env;
 
 fn main() {
-    run();
+    let args: Vec<String> = env::args().collect();
+    run(args);
 }
