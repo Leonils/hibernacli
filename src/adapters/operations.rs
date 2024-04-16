@@ -9,8 +9,6 @@ mod help {
 }
 
 pub mod device {
-    use std::error::Error;
-
     use crate::models::secondary_device::{Device, DeviceFactory, DeviceFactoryKey};
 
     /// Manage devices where backups are stored
@@ -36,15 +34,15 @@ pub mod device {
 
         /// Add a device to the list of devices
         /// The device is built by the factory returned by get_device_factory
-        fn add_device(&self, device: Box<dyn Device>) -> Result<Box<dyn Device>, Box<dyn Error>>;
+        fn add_device(&self, device: Box<dyn Device>) -> Result<(), Box<String>>;
 
         /// Once created, a device is identified by its unique name
         /// This function removes the device by its name
-        fn remove_by_name(&self);
+        fn remove_by_name(&self, name: String) -> Result<(), Box<String>>;
 
         /// List all devices
         /// The list is sorted by the device name
-        fn list(&self) -> Vec<Box<dyn Device>>;
+        fn list(&self) -> Result<Vec<Box<dyn Device>>, String>;
     }
 }
 

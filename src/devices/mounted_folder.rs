@@ -38,6 +38,14 @@ impl Device for MountedFolder {
     fn get_last_disconnection(&self) -> Option<Instant> {
         None
     }
+
+    fn to_toml_table(&self) -> toml::value::Table {
+        let mut table = toml::value::Table::new();
+        table.insert("type".to_string(), self.get_device_type_name().into());
+        table.insert("path".to_string(), self.path.display().to_string().into());
+        table.insert("name".to_string(), self.get_name().into());
+        table
+    }
 }
 
 struct MountedFolderFactory {
@@ -105,6 +113,23 @@ impl DeviceFactory for MountedFolderFactory {
         let name = if name.is_empty() { None } else { Some(name) };
         Ok(Box::new(MountedFolder {
             name,
+            path: PathBuf::from(path),
+        }))
+    }
+
+    fn build_from_toml_table(
+        &self,
+        name: &str,
+        table: &toml::value::Table,
+    ) -> Result<Box<dyn Device>, String> {
+        let path = table
+            .get("path")
+            .ok_or_else(|| "missing field `path`".to_string())?
+            .as_str()
+            .ok_or_else(|| "Invalid string for 'path'".to_string())?;
+
+        Ok(Box::new(MountedFolder {
+            name: Some(name.to_string()),
             path: PathBuf::from(path),
         }))
     }
@@ -201,6 +226,61 @@ mod test {
         assert_eq!(
             "Not all questions have been answered",
             device.err().unwrap()
+        );
+    }
+
+    #[test]
+    fn when_creating_device_from_toml_table_it_shall_have_the_right_name_and_location() {
+        let factory = MountedFolderFactory::new();
+        let mut table = toml::value::Table::new();
+        table.insert(
+            "path".to_string(),
+            toml::Value::String("/media/user/0000-0000".to_string()),
+        );
+        table.insert(
+            "name".to_string(),
+            toml::Value::String("MyUsbKey".to_string()),
+        );
+
+        let device = factory.build_from_toml_table("MyUsbKey", &table).unwrap();
+        assert_eq!(device.get_name(), "MyUsbKey");
+        assert_eq!(device.get_location(), "/media/user/0000-0000");
+    }
+
+    #[test]
+    fn when_creating_device_from_toml_with_no_path_it_shall_return_error() {
+        let factory = MountedFolderFactory::new();
+        let table = toml::value::Table::new();
+
+        let device = factory.build_from_toml_table("MyUsbKey", &table);
+        assert_eq!("missing field `path`", device.err().unwrap());
+    }
+
+    #[test]
+    fn when_creating_device_from_toml_with_invalid_path_it_shall_return_error() {
+        let factory = MountedFolderFactory::new();
+        let mut table = toml::value::Table::new();
+        table.insert("path".to_string(), toml::Value::Integer(42));
+
+        let device = factory.build_from_toml_table("MyUsbKey", &table);
+        assert_eq!("Invalid string for 'path'", device.err().unwrap());
+    }
+
+    #[test]
+    fn when_serializing_device_to_toml_with_name_it_shall_have_name_path_and_type() {
+        let device = MountedFolder {
+            name: Some("MyUsbKey".to_string()),
+            path: PathBuf::from("/media/user/0000-0000"),
+        };
+
+        let table = device.to_toml_table();
+        let string_table = toml::to_string(&table).unwrap();
+        assert_eq!(
+            string_table,
+            r#"name = "MyUsbKey"
+path = "/media/user/0000-0000"
+type = "MountedFolder"
+"#
         );
     }
 }

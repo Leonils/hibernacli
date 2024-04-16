@@ -1,9 +1,6 @@
 use std::time::Instant;
 
-use super::{
-    backup_requirement::SecurityLevel,
-    question::{Question, QuestionType},
-};
+use super::{backup_requirement::SecurityLevel, question::QuestionType};
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct DeviceFactoryKey {
@@ -29,6 +26,9 @@ pub trait Device {
 
     // The last time the device was disconnected
     fn get_last_disconnection(&self) -> Option<Instant>;
+
+    // Serialize the device to a TOML table
+    fn to_toml_table(&self) -> toml::value::Table;
 }
 
 pub trait DeviceFactory {
@@ -37,4 +37,9 @@ pub trait DeviceFactory {
     fn set_question_answer(&mut self, answer: String) -> Result<(), String>;
     fn has_next(&self) -> bool;
     fn build(&self) -> Result<Box<dyn Device>, String>;
+    fn build_from_toml_table(
+        &self,
+        name: &str,
+        table: &toml::value::Table,
+    ) -> Result<Box<dyn Device>, String>;
 }
