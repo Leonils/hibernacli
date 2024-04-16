@@ -27,7 +27,7 @@ impl GlobalConfig {
     }
 }
 
-#[derive(serde::Deserialize, Debug, Default)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Default)]
 struct PartiallyParsedGlobalConfig {
     devices: Option<Vec<Table>>,
 }
@@ -56,11 +56,27 @@ impl GlobalConfig {
         Ok(GlobalConfig { devices })
     }
 
-    pub fn save(&self, config_provider: &impl GlobalConfigProvider) {
-        let config_toml = "";
+    pub fn save(&self, config_provider: &impl GlobalConfigProvider) -> Result<(), String> {
+        let device_tables = self
+            .devices
+            .iter()
+            .map(|device| device.to_toml_table())
+            .collect::<Vec<_>>();
+
+        let config_toml = toml::to_string(&PartiallyParsedGlobalConfig {
+            devices: if device_tables.is_empty() {
+                None
+            } else {
+                Some(device_tables)
+            },
+        })
+        .map_err(|e| e.to_string())?;
+
         config_provider
             .write_global_config_dir(&config_toml)
             .unwrap();
+
+        Ok(())
     }
 
     fn load_device_from_toml_bloc(
@@ -419,6 +435,26 @@ mod tests {
             .return_const(Ok(()));
 
         let global_config = GlobalConfig { devices: vec![] };
-        global_config.save(&config_provider);
+        global_config.save(&config_provider).unwrap();
+    }
+
+    #[test]
+    fn when_saving_config_with_some_devices_it_shall_save_config_with_devices() {
+        let mut config_provider = MockGlobalConfigProvider::new();
+        config_provider
+            .expect_write_global_config_dir()
+            .times(1)
+            .with(eq(r#"[[devices]]
+name = "MockDevice"
+type = "MockDevice"
+"#))
+            .return_const(Ok(()));
+
+        let device = MockDeviceFactory.build().unwrap();
+        let global_config = GlobalConfig {
+            devices: vec![device],
+        };
+
+        global_config.save(&config_provider).unwrap();
     }
 }
