@@ -43,7 +43,7 @@ impl DeviceOperations for Operations {
             .get_device_factory(&device_type)
     }
 
-    fn add_device(&self, device: Box<dyn Device>) -> Result<(), Box<dyn Error>> {
+    fn add_device(&self, device: Box<dyn Device>) -> Result<(), Box<String>> {
         let mut config = GlobalConfig::load(
             self.global_config_provider.as_ref(),
             &self.device_factory_registry,
@@ -54,8 +54,16 @@ impl DeviceOperations for Operations {
         Ok(())
     }
 
-    fn remove_by_name(&self) {
-        todo!()
+    fn remove_by_name(&self, name: String) -> Result<(), Box<String>> {
+        let mut config = GlobalConfig::load(
+            self.global_config_provider.as_ref(),
+            &self.device_factory_registry,
+        )?;
+
+        config.remove_device(&name)?;
+        config.save(self.global_config_provider.as_ref())?;
+
+        Ok(())
     }
 
     fn list(&self) -> Result<Vec<Box<dyn Device>>, String> {
@@ -255,5 +263,39 @@ type = "MockDevice"
 
         let device = Box::new(MockDevice::new("MockDevice"));
         operations.add_device(device).unwrap();
+    }
+
+    #[test]
+    fn when_removing_last_device_by_name_it_shall_update_the_configuration() {
+        let mut registry = DeviceFactoryRegistry::new();
+        registry.register_device(
+            "MockDevice".to_string(),
+            "Mock Device".to_string(),
+            Box::new(MockDeviceFactory),
+        );
+
+        let mut provider = MockGlobalConfigProvider::new();
+        provider
+            .expect_read_global_config_dir()
+            .return_const(Ok(r#"[[devices]]
+name = "AnotherDevice"
+type = "MockDevice"
+"#
+            .to_string()));
+
+        provider
+            .expect_write_global_config_dir()
+            .times(1)
+            .with(eq(r#""#.to_string()))
+            .return_const(Ok(()));
+
+        let operations = Operations {
+            device_factory_registry: registry,
+            global_config_provider: Box::new(provider),
+        };
+
+        operations
+            .remove_by_name("AnotherDevice".to_string())
+            .unwrap();
     }
 }
