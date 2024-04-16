@@ -115,10 +115,11 @@ impl GlobalConfig {
 #[cfg(test)]
 mod tests {
     use crate::{
+        adapters::primary_device::MockGlobalConfigProvider,
         core::{
-            device_factories_registry::{self, DeviceFactoryRegistry},
+            device_factories_registry::DeviceFactoryRegistry,
             test_utils::mocks::{
-                MockDeviceFactory, MockDeviceWithParametersFactory, MockGlobalConfigProvider,
+                MockDeviceFactory, MockDeviceWithParametersFactory, MockGlobalConfigProviderFactory,
             },
         },
         models::secondary_device::DeviceFactory,
@@ -144,7 +145,7 @@ mod tests {
     #[test]
     fn when_failing_to_retrieve_config_it_shall_return_the_error() {
         let device_factories_registry = get_mock_device_factory_registry();
-        let config_provider = MockGlobalConfigProvider::new_failing_on_read();
+        let config_provider = MockGlobalConfigProviderFactory::new_failing_to_read();
         let config = GlobalConfig::load(config_provider, device_factories_registry);
         assert!(config.is_err());
     }
@@ -152,7 +153,7 @@ mod tests {
     #[test]
     fn when_retrieving_config_it_shall_return_the_config() {
         let device_factories_registry = get_mock_device_factory_registry();
-        let config_provider = MockGlobalConfigProvider::new("");
+        let config_provider = MockGlobalConfigProviderFactory::new("");
         let config = GlobalConfig::load(config_provider, device_factories_registry);
         assert!(config.is_ok());
     }
@@ -160,7 +161,7 @@ mod tests {
     #[test]
     fn when_retrieving_config_with_no_device_it_shall_have_no_device_in_global_config() {
         let device_factories_registry = get_mock_device_factory_registry();
-        let config_provider = MockGlobalConfigProvider::new("");
+        let config_provider = MockGlobalConfigProviderFactory::new("");
         let config = GlobalConfig::load(config_provider, device_factories_registry).unwrap();
         assert_eq!(config.devices.len(), 0);
     }
@@ -168,12 +169,12 @@ mod tests {
     #[test]
     fn when_retrieving_config_with_one_mock_device_it_shall_have_one_device_in_global_config() {
         let device_factories_registry = get_mock_device_factory_registry();
-        let config_provider = MockGlobalConfigProvider::new(
+        let config_provider = MockGlobalConfigProviderFactory::new(
             r#"
-[[devices]]
-name = "MockDevice"
-type = "MockDevice"
-"#,
+    [[devices]]
+    name = "MockDevice"
+    type = "MockDevice"
+    "#,
         );
         let config = GlobalConfig::load(config_provider, device_factories_registry).unwrap();
         assert_eq!(config.devices.len(), 1);
@@ -184,12 +185,12 @@ type = "MockDevice"
     #[test]
     fn when_retrieving_config_with_different_name_it_shall_be_reflected_in_device() {
         let device_factories_registry = get_mock_device_factory_registry();
-        let config_provider = MockGlobalConfigProvider::new(
+        let config_provider = MockGlobalConfigProviderFactory::new(
             r#"
-[[devices]]
-name = "MyPersonalDevice"
-type = "MockDevice"
-"#,
+    [[devices]]
+    name = "MyPersonalDevice"
+    type = "MockDevice"
+    "#,
         );
         let config = GlobalConfig::load(config_provider, device_factories_registry).unwrap();
         assert_eq!(config.devices.len(), 1);
@@ -200,16 +201,16 @@ type = "MockDevice"
     #[test]
     fn when_retrieving_config_with_multiple_devices_it_shall_have_all_devices_in_global_config() {
         let device_factories_registry = get_mock_device_factory_registry();
-        let config_provider = MockGlobalConfigProvider::new(
+        let config_provider = MockGlobalConfigProviderFactory::new(
             r#"
-[[devices]]
-name = "MyPersonalDevice"
-type = "MockDevice"
+    [[devices]]
+    name = "MyPersonalDevice"
+    type = "MockDevice"
 
-[[devices]]
-name = "MySecondPersonalDevice"
-type = "MockDevice"
-"#,
+    [[devices]]
+    name = "MySecondPersonalDevice"
+    type = "MockDevice"
+    "#,
         );
         let config = GlobalConfig::load(config_provider, device_factories_registry).unwrap();
         assert_eq!(config.devices.len(), 2);
@@ -222,12 +223,12 @@ type = "MockDevice"
     #[test]
     fn if_type_is_not_in_registry_it_shall_return_error() {
         let device_factories_registry = get_mock_device_factory_registry();
-        let config_provider = MockGlobalConfigProvider::new(
+        let config_provider = MockGlobalConfigProviderFactory::new(
             r#"
-[[devices]]
-name = "MyPersonalDevice"
-type = "UnknownDevice"
-"#,
+    [[devices]]
+    name = "MyPersonalDevice"
+    type = "UnknownDevice"
+    "#,
         );
         let config = GlobalConfig::load(config_provider, device_factories_registry);
         assert!(config.is_err());
@@ -237,11 +238,11 @@ type = "UnknownDevice"
     #[test]
     fn if_name_is_missing_it_shall_fail() {
         let device_factories_registry = get_mock_device_factory_registry();
-        let config_provider = MockGlobalConfigProvider::new(
+        let config_provider = MockGlobalConfigProviderFactory::new(
             r#"
-[[devices]]
-type = "MockDevice"
-"#,
+    [[devices]]
+    type = "MockDevice"
+    "#,
         );
         let config = GlobalConfig::load(config_provider, device_factories_registry);
         assert!(config.is_err());
@@ -251,15 +252,15 @@ type = "MockDevice"
     #[test]
     fn if_multiple_errors_in_device_it_shall_return_first_error_of_each_device() {
         let device_factories_registry = get_mock_device_factory_registry();
-        let config_provider = MockGlobalConfigProvider::new(
+        let config_provider = MockGlobalConfigProviderFactory::new(
             r#"
-[[devices]]
-type = "MockDevice"
+    [[devices]]
+    type = "MockDevice"
 
-[[devices]]
-name = "MyPersonalDevice"
-type = "UnknownDevice"
-"#,
+    [[devices]]
+    name = "MyPersonalDevice"
+    type = "UnknownDevice"
+    "#,
         );
         let config = GlobalConfig::load(config_provider, device_factories_registry);
         assert!(config.is_err());
@@ -272,17 +273,17 @@ type = "UnknownDevice"
     #[test]
     fn when_there_are_multiple_device_types_each_device_type_shall_be_parsed() {
         let registry = get_mock_device_factory_registry();
-        let config_provider = MockGlobalConfigProvider::new(
+        let config_provider = MockGlobalConfigProviderFactory::new(
             r#"
-[[devices]]
-name = "MyPersonalDevice"
-type = "MockDevice"
+    [[devices]]
+    name = "MyPersonalDevice"
+    type = "MockDevice"
 
-[[devices]]
-name = "MySecondPersonalDevice"
-type = "MockDeviceWithParameters"
-parameter = "MyParameter"
-"#,
+    [[devices]]
+    name = "MySecondPersonalDevice"
+    type = "MockDeviceWithParameters"
+    parameter = "MyParameter"
+    "#,
         );
         let config = GlobalConfig::load(config_provider, registry).unwrap();
         assert_eq!(config.devices.len(), 2);
@@ -297,12 +298,12 @@ parameter = "MyParameter"
     #[test]
     fn when_a_type_with_additional_parameters_has_a_missing_parameter_it_should_propagate_error() {
         let registry = get_mock_device_factory_registry();
-        let config_provider = MockGlobalConfigProvider::new(
+        let config_provider = MockGlobalConfigProviderFactory::new(
             r#"
-[[devices]]
-name = "MySecondPersonalDevice"
-type = "MockDeviceWithParameters"
-"#,
+    [[devices]]
+    name = "MySecondPersonalDevice"
+    type = "MockDeviceWithParameters"
+    "#,
         );
         let config = GlobalConfig::load(config_provider, registry);
         assert!(config.is_err());
@@ -312,16 +313,16 @@ type = "MockDeviceWithParameters"
     #[test]
     fn when_loading_configuration_if_there_is_2_devices_of_same_name_there_should_be_an_error() {
         let registry = get_mock_device_factory_registry();
-        let config_provider = MockGlobalConfigProvider::new(
+        let config_provider = MockGlobalConfigProviderFactory::new(
             r#"
-[[devices]]
-name = "MyPersonalDevice"
-type = "MockDevice"
+    [[devices]]
+    name = "MyPersonalDevice"
+    type = "MockDevice"
 
-[[devices]]
-name = "MyPersonalDevice"
-type = "MockDevice"
-"#,
+    [[devices]]
+    name = "MyPersonalDevice"
+    type = "MockDevice"
+    "#,
         );
         let config = GlobalConfig::load(config_provider, registry);
         assert!(config.is_err());
@@ -334,24 +335,24 @@ type = "MockDevice"
     #[test]
     fn when_loading_configuration_if_there_is_4_devices_of_same_name_there_should_be_an_error() {
         let registry = get_mock_device_factory_registry();
-        let config_provider = MockGlobalConfigProvider::new(
+        let config_provider = MockGlobalConfigProviderFactory::new(
             r#"
-[[devices]]
-name = "MyPersonalDevice"
-type = "MockDevice"
+    [[devices]]
+    name = "MyPersonalDevice"
+    type = "MockDevice"
 
-[[devices]]
-name = "MyPersonalDevice"
-type = "MockDevice"
+    [[devices]]
+    name = "MyPersonalDevice"
+    type = "MockDevice"
 
-[[devices]]
-name = "MyOtherDevice"
-type = "MockDevice"
+    [[devices]]
+    name = "MyOtherDevice"
+    type = "MockDevice"
 
-[[devices]]
-name = "MyOtherDevice"
-type = "MockDevice"
-"#,
+    [[devices]]
+    name = "MyOtherDevice"
+    type = "MockDevice"
+    "#,
         );
         let config = GlobalConfig::load(config_provider, registry);
         assert!(config.is_err());

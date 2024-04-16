@@ -1,7 +1,7 @@
 use std::time::Instant;
 
 use crate::{
-    adapters::primary_device::GlobalConfigProvider,
+    adapters::primary_device::MockGlobalConfigProvider,
     models::{
         backup_requirement::SecurityLevel,
         secondary_device::{Device, DeviceFactory},
@@ -120,38 +120,21 @@ impl Device for MockDevice {
     }
 }
 
-pub struct MockGlobalConfigProvider {
-    pub global_config_toml: String,
-    pub fail_on_read: bool,
-}
-impl MockGlobalConfigProvider {
-    pub fn new(global_config_toml: &str) -> Self {
-        MockGlobalConfigProvider {
-            global_config_toml: global_config_toml.to_string(),
-            fail_on_read: false,
-        }
+pub struct MockGlobalConfigProviderFactory;
+impl MockGlobalConfigProviderFactory {
+    pub fn new(global_config_toml: &str) -> MockGlobalConfigProvider {
+        let mut provider = MockGlobalConfigProvider::new();
+        provider
+            .expect_read_global_config_dir()
+            .return_const(Ok(global_config_toml.to_string()));
+        provider
     }
 
-    pub fn new_failing_on_read() -> Self {
-        MockGlobalConfigProvider {
-            global_config_toml: "".to_string(),
-            fail_on_read: true,
-        }
-    }
-}
-impl GlobalConfigProvider for MockGlobalConfigProvider {
-    fn init_global_config_dir(&self) -> Result<(), String> {
-        Ok(())
-    }
-
-    fn read_global_config_dir(&self) -> Result<String, String> {
-        if self.fail_on_read {
-            return Err("Failed to read global config".to_string());
-        }
-        Ok(self.global_config_toml.clone())
-    }
-
-    fn write_global_config_dir(&self, _content: &str) -> Result<(), String> {
-        Ok(())
+    pub fn new_failing_to_read() -> MockGlobalConfigProvider {
+        let mut provider = MockGlobalConfigProvider::new();
+        provider
+            .expect_read_global_config_dir()
+            .return_const(Err("Error reading global config".to_string()));
+        provider
     }
 }
