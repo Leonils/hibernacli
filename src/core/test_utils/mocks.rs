@@ -43,6 +43,14 @@ pub struct MockDeviceWithParameters {
     pub name: String,
     pub parameter: String,
 }
+impl MockDeviceWithParameters {
+    pub fn new(name: &str, parameter: &str) -> MockDeviceWithParameters {
+        MockDeviceWithParameters {
+            name: name.to_string(),
+            parameter: parameter.to_string(),
+        }
+    }
+}
 impl Device for MockDeviceWithParameters {
     fn get_name(&self) -> String {
         self.name.clone()
@@ -105,6 +113,13 @@ impl DeviceFactory for MockDeviceWithParametersFactory {
 
 pub struct MockDevice {
     pub name: String,
+}
+impl MockDevice {
+    pub fn new(name: &str) -> MockDevice {
+        MockDevice {
+            name: name.to_string(),
+        }
+    }
 }
 impl Device for MockDevice {
     fn get_name(&self) -> String {
