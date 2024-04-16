@@ -30,7 +30,7 @@ impl DeviceFactory for MockDeviceFactory {
     fn build_from_toml_table(
         &self,
         name: &str,
-        table: &toml::value::Table,
+        _table: &toml::value::Table,
     ) -> Result<Box<dyn Device>, String> {
         Ok(Box::new(MockDevice {
             name: name.to_string(),
@@ -153,7 +153,7 @@ impl MockGlobalConfigProviderFactory {
     pub fn new(global_config_toml: &str) -> MockGlobalConfigProvider {
         let mut provider = MockGlobalConfigProvider::new();
         provider
-            .expect_read_global_config_dir()
+            .expect_read_global_config()
             .return_const(Ok(global_config_toml.to_string()));
         provider
     }
@@ -161,7 +161,7 @@ impl MockGlobalConfigProviderFactory {
     pub fn new_failing_to_read() -> MockGlobalConfigProvider {
         let mut provider = MockGlobalConfigProvider::new();
         provider
-            .expect_read_global_config_dir()
+            .expect_read_global_config()
             .return_const(Err("Error reading global config".to_string()));
         provider
     }

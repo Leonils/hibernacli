@@ -27,7 +27,7 @@ impl<'a> LocalFileStorage<'a> {
 }
 
 impl<'a> GlobalConfigProvider for LocalFileStorage<'a> {
-    fn init_global_config_dir(&self) -> Result<(), String> {
+    fn init_global_config(&self) -> Result<(), String> {
         if !self.config_dir.exists() {
             self.file_system
                 .create_dir_all(self.config_dir.to_owned().into_path_buf())?;
@@ -42,8 +42,8 @@ impl<'a> GlobalConfigProvider for LocalFileStorage<'a> {
         Ok(())
     }
 
-    fn read_global_config_dir(&self) -> Result<String, String> {
-        self.init_global_config_dir().map_err(|_| {
+    fn read_global_config(&self) -> Result<String, String> {
+        self.init_global_config().map_err(|_| {
             "Config file was missing and an error occurred while creating it.".to_string()
         })?;
 
@@ -51,7 +51,7 @@ impl<'a> GlobalConfigProvider for LocalFileStorage<'a> {
             .read_file(self.config_dir.join("config.toml"))
     }
 
-    fn write_global_config_dir(&self, content: &str) -> Result<(), String> {
+    fn write_global_config(&self, content: &str) -> Result<(), String> {
         if !self.config_dir.exists() {
             self.file_system
                 .create_dir_all(self.config_dir.to_owned().into_path_buf())?;
@@ -138,7 +138,7 @@ mod tests {
         // act
         let local_unix_file_storage =
             LocalFileStorage::new(&mock_path_provider, &file_system, "test");
-        let res = local_unix_file_storage.init_global_config_dir();
+        let res = local_unix_file_storage.init_global_config();
 
         // assert
         assert_eq!(res, Ok(()));
@@ -160,7 +160,7 @@ mod tests {
         // act
         let local_unix_file_storage =
             LocalFileStorage::new(&mock_path_provider, &file_system, "test");
-        let res = local_unix_file_storage.init_global_config_dir();
+        let res = local_unix_file_storage.init_global_config();
 
         // assert
         let config_path = config_dir.join("config.toml");
@@ -178,7 +178,7 @@ mod tests {
         // act
         let local_unix_file_storage =
             LocalFileStorage::new(&mock_path_provider, &file_system, "test");
-        let res = local_unix_file_storage.init_global_config_dir();
+        let res = local_unix_file_storage.init_global_config();
 
         // assert
         let config_path = mock_path_provider
@@ -227,7 +227,7 @@ mod tests {
         // act
         let local_unix_file_storage =
             LocalFileStorage::new(&mock_path_provider, &file_system, "test");
-        let res = local_unix_file_storage.init_global_config_dir();
+        let res = local_unix_file_storage.init_global_config();
 
         // assert
         assert_eq!(res, Err("Could not write file".to_string()));
@@ -255,7 +255,7 @@ mod tests {
         // act
         let local_unix_file_storage =
             LocalFileStorage::new(&mock_path_provider, &file_system, "config");
-        let res = local_unix_file_storage.init_global_config_dir();
+        let res = local_unix_file_storage.init_global_config();
 
         // assert
         assert_eq!(res, Err("Could not create dir".to_string()));
@@ -274,7 +274,7 @@ mod tests {
         // act
         let local_unix_file_storage =
             LocalFileStorage::new(&mock_path_provider, &file_system, "config");
-        let res = local_unix_file_storage.read_global_config_dir();
+        let res = local_unix_file_storage.read_global_config();
 
         // assert
         assert_eq!(res, Ok("previous-content".to_string()));
@@ -289,7 +289,7 @@ mod tests {
         // act
         let local_unix_file_storage =
             LocalFileStorage::new(&mock_path_provider, &file_system, "config");
-        let res = local_unix_file_storage.read_global_config_dir();
+        let res = local_unix_file_storage.read_global_config();
 
         // assert
         assert_eq!(res, Ok("config".to_string()));
@@ -304,7 +304,7 @@ mod tests {
         // act
         let local_unix_file_storage =
             LocalFileStorage::new(&mock_path_provider, &file_system, "config");
-        let res = local_unix_file_storage.read_global_config_dir();
+        let res = local_unix_file_storage.read_global_config();
 
         // assert
         assert_eq!(
@@ -326,7 +326,7 @@ mod tests {
         // act
         let local_unix_file_storage =
             LocalFileStorage::new(&mock_path_provider, &file_system, "config");
-        let res = local_unix_file_storage.write_global_config_dir("new-content");
+        let res = local_unix_file_storage.write_global_config("new-content");
 
         // assert
         assert_eq!(res, Ok(()));
@@ -342,7 +342,7 @@ mod tests {
         // act
         let local_unix_file_storage =
             LocalFileStorage::new(&mock_path_provider, &file_system, "config");
-        let res = local_unix_file_storage.write_global_config_dir("new-content");
+        let res = local_unix_file_storage.write_global_config("new-content");
 
         // assert
         let config_path = mock_path_provider
@@ -379,7 +379,7 @@ mod tests {
         // act
         let local_unix_file_storage =
             LocalFileStorage::new(&mock_path_provider, &file_system, "config");
-        let res = local_unix_file_storage.write_global_config_dir("new-content");
+        let res = local_unix_file_storage.write_global_config("new-content");
 
         // assert
         assert_eq!(res, Err("Could not write file".to_string()));
