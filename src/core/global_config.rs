@@ -144,7 +144,8 @@ mod tests {
         core::{
             device_factories_registry::DeviceFactoryRegistry,
             test_utils::mocks::{
-                MockDeviceFactory, MockDeviceWithParametersFactory, MockGlobalConfigProviderFactory,
+                MockDevice, MockDeviceFactory, MockDeviceWithParameters,
+                MockDeviceWithParametersFactory, MockGlobalConfigProviderFactory,
             },
         },
         models::secondary_device::DeviceFactory,
@@ -453,6 +454,32 @@ type = "MockDevice"
         let device = MockDeviceFactory.build().unwrap();
         let global_config = GlobalConfig {
             devices: vec![device],
+        };
+
+        global_config.save(&config_provider).unwrap();
+    }
+
+    #[test]
+    fn when_saving_config_with_multiple_devices_it_shall_save_config_with_devices() {
+        let mut config_provider = MockGlobalConfigProvider::new();
+        config_provider
+            .expect_write_global_config_dir()
+            .times(1)
+            .with(eq(r#"[[devices]]
+name = "MockDevice"
+type = "MockDevice"
+
+[[devices]]
+name = "MyDevice"
+parameter = "MyParameter"
+type = "MockDeviceWithParameters"
+"#))
+            .return_const(Ok(()));
+
+        let device1 = MockDevice::new("MockDevice");
+        let device2 = MockDeviceWithParameters::new("MyDevice", "MyParameter");
+        let global_config = GlobalConfig {
+            devices: vec![Box::new(device1), Box::new(device2)],
         };
 
         global_config.save(&config_provider).unwrap();
