@@ -5,7 +5,7 @@ use crate::{adapters::primary_device::GlobalConfigProvider, models::secondary_de
 
 use super::device_factories_registry::DeviceFactoryRegistry;
 
-struct GlobalConfig {
+pub struct GlobalConfig {
     devices: Vec<Box<dyn Device>>,
 }
 
@@ -25,6 +25,10 @@ impl GlobalConfig {
         self.devices.push(device);
         Ok(())
     }
+
+    pub fn get_devices(self) -> Vec<Box<dyn Device>> {
+        self.devices
+    }
 }
 
 #[derive(serde::Deserialize, serde::Serialize, Debug, Default)]
@@ -34,8 +38,8 @@ struct PartiallyParsedGlobalConfig {
 
 impl GlobalConfig {
     pub fn load(
-        config_provider: impl GlobalConfigProvider,
-        device_factories_registry: DeviceFactoryRegistry,
+        config_provider: &dyn GlobalConfigProvider,
+        device_factories_registry: &DeviceFactoryRegistry,
     ) -> Result<GlobalConfig, String> {
         let config_toml = config_provider.read_global_config_dir()?;
 
@@ -172,7 +176,7 @@ mod tests {
     fn when_failing_to_retrieve_config_it_shall_return_the_error() {
         let device_factories_registry = get_mock_device_factory_registry();
         let config_provider = MockGlobalConfigProviderFactory::new_failing_to_read();
-        let config = GlobalConfig::load(config_provider, device_factories_registry);
+        let config = GlobalConfig::load(&config_provider, &device_factories_registry);
         assert!(config.is_err());
     }
 
@@ -180,7 +184,7 @@ mod tests {
     fn when_retrieving_config_it_shall_return_the_config() {
         let device_factories_registry = get_mock_device_factory_registry();
         let config_provider = MockGlobalConfigProviderFactory::new("");
-        let config = GlobalConfig::load(config_provider, device_factories_registry);
+        let config = GlobalConfig::load(&config_provider, &device_factories_registry);
         assert!(config.is_ok());
     }
 
@@ -188,7 +192,7 @@ mod tests {
     fn when_retrieving_config_with_no_device_it_shall_have_no_device_in_global_config() {
         let device_factories_registry = get_mock_device_factory_registry();
         let config_provider = MockGlobalConfigProviderFactory::new("");
-        let config = GlobalConfig::load(config_provider, device_factories_registry).unwrap();
+        let config = GlobalConfig::load(&config_provider, &device_factories_registry).unwrap();
         assert_eq!(config.devices.len(), 0);
     }
 
@@ -202,7 +206,7 @@ mod tests {
     type = "MockDevice"
     "#,
         );
-        let config = GlobalConfig::load(config_provider, device_factories_registry).unwrap();
+        let config = GlobalConfig::load(&config_provider, &device_factories_registry).unwrap();
         assert_eq!(config.devices.len(), 1);
         assert_eq!(config.devices[0].get_device_type_name(), "MockDevice");
         assert_eq!(config.devices[0].get_name(), "MockDevice");
@@ -218,7 +222,7 @@ mod tests {
     type = "MockDevice"
     "#,
         );
-        let config = GlobalConfig::load(config_provider, device_factories_registry).unwrap();
+        let config = GlobalConfig::load(&config_provider, &device_factories_registry).unwrap();
         assert_eq!(config.devices.len(), 1);
         assert_eq!(config.devices[0].get_device_type_name(), "MockDevice");
         assert_eq!(config.devices[0].get_name(), "MyPersonalDevice");
@@ -238,7 +242,7 @@ mod tests {
     type = "MockDevice"
     "#,
         );
-        let config = GlobalConfig::load(config_provider, device_factories_registry).unwrap();
+        let config = GlobalConfig::load(&config_provider, &device_factories_registry).unwrap();
         assert_eq!(config.devices.len(), 2);
         assert_eq!(config.devices[0].get_device_type_name(), "MockDevice");
         assert_eq!(config.devices[0].get_name(), "MyPersonalDevice");
@@ -256,7 +260,7 @@ mod tests {
     type = "UnknownDevice"
     "#,
         );
-        let config = GlobalConfig::load(config_provider, device_factories_registry);
+        let config = GlobalConfig::load(&config_provider, &device_factories_registry);
         assert!(config.is_err());
         assert_eq!(config.err().unwrap(), "Device factory not found");
     }
@@ -270,7 +274,7 @@ mod tests {
     type = "MockDevice"
     "#,
         );
-        let config = GlobalConfig::load(config_provider, device_factories_registry);
+        let config = GlobalConfig::load(&config_provider, &device_factories_registry);
         assert!(config.is_err());
         assert_eq!(config.err().unwrap(), "Missing name for device");
     }
@@ -288,7 +292,7 @@ mod tests {
     type = "UnknownDevice"
     "#,
         );
-        let config = GlobalConfig::load(config_provider, device_factories_registry);
+        let config = GlobalConfig::load(&config_provider, &device_factories_registry);
         assert!(config.is_err());
         assert_eq!(
             config.err().unwrap(),
@@ -311,7 +315,7 @@ mod tests {
     parameter = "MyParameter"
     "#,
         );
-        let config = GlobalConfig::load(config_provider, registry).unwrap();
+        let config = GlobalConfig::load(&config_provider, &registry).unwrap();
         assert_eq!(config.devices.len(), 2);
         assert_eq!(config.devices[0].get_device_type_name(), "MockDevice");
         assert_eq!(config.devices[0].get_name(), "MyPersonalDevice");
@@ -331,7 +335,7 @@ mod tests {
     type = "MockDeviceWithParameters"
     "#,
         );
-        let config = GlobalConfig::load(config_provider, registry);
+        let config = GlobalConfig::load(&config_provider, &registry);
         assert!(config.is_err());
         assert_eq!(config.err().unwrap(), "Missing parameter");
     }
@@ -350,7 +354,7 @@ mod tests {
     type = "MockDevice"
     "#,
         );
-        let config = GlobalConfig::load(config_provider, registry);
+        let config = GlobalConfig::load(&config_provider, &registry);
         assert!(config.is_err());
         assert_eq!(
             config.err().unwrap(),
@@ -380,7 +384,7 @@ mod tests {
     type = "MockDevice"
     "#,
         );
-        let config = GlobalConfig::load(config_provider, registry);
+        let config = GlobalConfig::load(&config_provider, &registry);
         assert!(config.is_err());
         assert_eq!(
             config.err().unwrap(),
