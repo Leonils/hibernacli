@@ -1,7 +1,7 @@
-use std::error::Error;
+use std::{error::Error, vec};
 
 use crate::{
-    adapters::operations::device::DeviceOperations,
+    adapters::{operations::device::DeviceOperations, primary_device::GlobalConfigProvider},
     models::secondary_device::{Device, DeviceFactory, DeviceFactoryKey},
 };
 
@@ -9,11 +9,13 @@ use super::device_factories_registry::DeviceFactoryRegistry;
 
 struct Operations {
     device_factory_registry: DeviceFactoryRegistry,
+    global_config_provider: Box<dyn GlobalConfigProvider>,
 }
 impl Operations {
-    fn new() -> Self {
+    fn new(global_config_provider: Box<dyn GlobalConfigProvider>) -> Self {
         Operations {
             device_factory_registry: DeviceFactoryRegistry::new(),
+            global_config_provider,
         }
     }
 
@@ -50,26 +52,38 @@ impl DeviceOperations for Operations {
     }
 
     fn list(&self) -> Vec<Box<dyn Device>> {
-        todo!()
+        vec![]
     }
 }
 
 #[cfg(test)]
 mod test {
-    use crate::core::test_utils::mocks::MockDeviceFactory;
+    use crate::{
+        adapters::primary_device::MockGlobalConfigProvider,
+        core::test_utils::mocks::MockDeviceFactory,
+    };
 
     use super::*;
 
+    impl Operations {
+        fn new_with_mocked_dependencies() -> Self {
+            Operations {
+                device_factory_registry: DeviceFactoryRegistry::new(),
+                global_config_provider: Box::new(MockGlobalConfigProvider::new()),
+            }
+        }
+    }
+
     #[test]
     fn with_an_empty_registry_no_factory_is_returned() {
-        let operations = Operations::new();
+        let operations = Operations::new_with_mocked_dependencies();
         let available_factories = operations.get_available_device_factories();
         assert!(available_factories.is_empty());
     }
 
     #[test]
     fn after_registering_a_factory_it_can_be_retrieved() {
-        let mut operations = Operations::new();
+        let mut operations = Operations::new_with_mocked_dependencies();
         operations.register_device_factory(
             "MockDevice".to_string(),
             "Mock Device".to_string(),
@@ -84,14 +98,14 @@ mod test {
 
     #[test]
     fn if_no_factory_is_registered_none_is_returned_when_retrieving_a_factory() {
-        let operations = Operations::new();
+        let operations = Operations::new_with_mocked_dependencies();
         let device_factory = operations.get_device_factory("MockDevice".to_string());
         assert!(device_factory.is_none());
     }
 
     #[test]
     fn after_registering_a_factory_it_can_be_used_to_create_a_device() {
-        let mut operations = Operations::new();
+        let mut operations = Operations::new_with_mocked_dependencies();
         operations.register_device_factory(
             "MockDevice".to_string(),
             "Mock Device".to_string(),
@@ -108,7 +122,7 @@ mod test {
 
     #[test]
     fn when_registering_a_factory_and_retrieving_a_not_added_one_it_shall_return_none() {
-        let mut operations = Operations::new();
+        let mut operations = Operations::new_with_mocked_dependencies();
         operations.register_device_factory(
             "MockDevice".to_string(),
             "Mock Device".to_string(),
@@ -117,5 +131,12 @@ mod test {
 
         let device_factory = operations.get_device_factory("NotAdded".to_string());
         assert!(device_factory.is_none());
+    }
+
+    #[test]
+    fn when_listing_devices_with_no_config_file_no_devices_are_returned() {
+        let operations = Operations::new_with_mocked_dependencies();
+        let devices = operations.list();
+        assert!(devices.is_empty());
     }
 }
