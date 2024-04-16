@@ -1,5 +1,3 @@
-use std::{error::Error, vec};
-
 use crate::{
     adapters::{operations::device::DeviceOperations, primary_device::GlobalConfigProvider},
     models::secondary_device::{Device, DeviceFactory, DeviceFactoryKey},
