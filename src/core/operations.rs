@@ -216,4 +216,44 @@ type = "MockDevice"
         let device = Box::new(MockDevice::new("MockDevice"));
         operations.add_device(device).unwrap();
     }
+
+    #[test]
+    fn when_adding_a_device_to_config_with_another_device_it_shall_add_it_to_the_configuration() {
+        let mut registry = DeviceFactoryRegistry::new();
+        registry.register_device(
+            "MockDevice".to_string(),
+            "Mock Device".to_string(),
+            Box::new(MockDeviceFactory),
+        );
+
+        let mut provider = MockGlobalConfigProvider::new();
+        provider
+            .expect_read_global_config_dir()
+            .return_const(Ok(r#"[[devices]]
+name = "AnotherDevice"
+type = "MockDevice"
+"#
+            .to_string()));
+        provider
+            .expect_write_global_config_dir()
+            .times(1)
+            .with(eq(r#"[[devices]]
+name = "AnotherDevice"
+type = "MockDevice"
+
+[[devices]]
+name = "MockDevice"
+type = "MockDevice"
+"#
+            .to_string()))
+            .return_const(Ok(()));
+
+        let operations = Operations {
+            device_factory_registry: registry,
+            global_config_provider: Box::new(provider),
+        };
+
+        let device = Box::new(MockDevice::new("MockDevice"));
+        operations.add_device(device).unwrap();
+    }
 }
