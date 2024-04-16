@@ -50,6 +50,16 @@ impl<'a> GlobalConfigProvider for LocalFileStorage<'a> {
         self.file_system
             .read_file(self.config_dir.join("config.toml"))
     }
+
+    fn write_global_config_dir(&self, content: &str) -> Result<(), String> {
+        if !self.config_dir.exists() {
+            self.file_system
+                .create_dir_all(self.config_dir.to_owned().into_path_buf())?;
+        }
+
+        self.file_system
+            .write_file(self.config_dir.join("config.toml"), content)
+    }
 }
 
 trait PathProvider {
@@ -301,5 +311,77 @@ mod tests {
             res,
             Err("Config file was missing and an error occurred while creating it.".to_string())
         );
+    }
+
+    #[test]
+    fn when_the_config_file_exists_when_we_write_config_it_shall_update_it() {
+        // arrange
+        let mock_path_provider = TmpLinuxPathProvider::new();
+        let file_system = StandardFileSystem {};
+        let config_dir = mock_path_provider.get_tmp_path().join("hibernacli");
+        std::fs::create_dir_all(&config_dir).unwrap();
+        let config_path = config_dir.join("config.toml");
+        std::fs::write(&config_path, "previous-content").unwrap();
+
+        // act
+        let local_unix_file_storage =
+            LocalFileStorage::new(&mock_path_provider, &file_system, "config");
+        let res = local_unix_file_storage.write_global_config_dir("new-content");
+
+        // assert
+        assert_eq!(res, Ok(()));
+        assert_eq!(std::fs::read_to_string(config_path).unwrap(), "new-content");
+    }
+
+    #[test]
+    fn when_the_config_file_does_not_exist_when_we_write_config_it_shall_create_it() {
+        // arrange
+        let mock_path_provider = TmpLinuxPathProvider::new();
+        let file_system = StandardFileSystem {};
+
+        // act
+        let local_unix_file_storage =
+            LocalFileStorage::new(&mock_path_provider, &file_system, "config");
+        let res = local_unix_file_storage.write_global_config_dir("new-content");
+
+        // assert
+        let config_path = mock_path_provider
+            .get_tmp_path()
+            .join("hibernacli")
+            .join("config.toml");
+        assert_eq!(res, Ok(()));
+        assert_eq!(std::fs::read_to_string(config_path).unwrap(), "new-content");
+    }
+
+    struct FailingWriteFileSystemForWrite;
+    impl super::FileSystem for FailingWriteFileSystemForWrite {
+        fn read_file(&self, _file_path: PathBuf) -> Result<String, String> {
+            Ok("".to_string())
+        }
+        fn write_file(&self, _file_path: PathBuf, _content: &str) -> Result<(), String> {
+            Err("Could not write file".to_string())
+        }
+        fn create_dir_all(&self, _dir_path: PathBuf) -> Result<(), String> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn when_the_config_file_exists_and_we_fail_to_write_it_error_shall_be_returned() {
+        // arrange
+        let mock_path_provider = TmpLinuxPathProvider::new();
+        let file_system = FailingWriteFileSystemForWrite {};
+        let config_dir = mock_path_provider.get_tmp_path().join("hibernacli");
+        std::fs::create_dir_all(&config_dir).unwrap();
+        let config_path = config_dir.join("config.toml");
+        std::fs::write(&config_path, "previous-content").unwrap();
+
+        // act
+        let local_unix_file_storage =
+            LocalFileStorage::new(&mock_path_provider, &file_system, "config");
+        let res = local_unix_file_storage.write_global_config_dir("new-content");
+
+        // assert
+        assert_eq!(res, Err("Could not write file".to_string()));
     }
 }
