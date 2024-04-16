@@ -1,9 +1,6 @@
 use std::time::Instant;
 
-use super::{
-    backup_requirement::SecurityLevel,
-    question::{Question, QuestionType},
-};
+use super::{backup_requirement::SecurityLevel, question::QuestionType};
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct DeviceFactoryKey {

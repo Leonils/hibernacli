@@ -9,8 +9,6 @@ mod help {
 }
 
 pub mod device {
-    use std::error::Error;
-
     use crate::models::secondary_device::{Device, DeviceFactory, DeviceFactoryKey};
 
     /// Manage devices where backups are stored
