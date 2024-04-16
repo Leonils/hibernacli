@@ -56,6 +56,13 @@ impl GlobalConfig {
         Ok(GlobalConfig { devices })
     }
 
+    pub fn save(&self, config_provider: &impl GlobalConfigProvider) {
+        let config_toml = "";
+        config_provider
+            .write_global_config_dir(&config_toml)
+            .unwrap();
+    }
+
     fn load_device_from_toml_bloc(
         device_table: toml::map::Map<String, toml::Value>,
         device_factories_registry: &DeviceFactoryRegistry,
@@ -114,6 +121,8 @@ impl GlobalConfig {
 
 #[cfg(test)]
 mod tests {
+    use mockall::predicate::eq;
+
     use crate::{
         adapters::primary_device::MockGlobalConfigProvider,
         core::{
@@ -398,5 +407,18 @@ mod tests {
         );
 
         assert_eq!(global_config.devices.len(), 1);
+    }
+
+    #[test]
+    fn when_saving_config_it_shall_call_save_on_config_provider() {
+        let mut config_provider = MockGlobalConfigProvider::new();
+        config_provider
+            .expect_write_global_config_dir()
+            .times(1)
+            .with(eq(""))
+            .return_const(Ok(()));
+
+        let global_config = GlobalConfig { devices: vec![] };
+        global_config.save(&config_provider);
     }
 }
