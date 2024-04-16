@@ -150,4 +150,8 @@ impl GlobalConfigProvider for MockGlobalConfigProvider {
         }
         Ok(self.global_config_toml.clone())
     }
+
+    fn write_global_config_dir(&self, _content: &str) -> Result<(), String> {
+        Ok(())
+    }
 }
