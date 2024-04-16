@@ -26,6 +26,17 @@ impl GlobalConfig {
         Ok(())
     }
 
+    pub fn remove_device(&mut self, name: &str) -> Result<(), String> {
+        let index = self
+            .devices
+            .iter()
+            .position(|d| d.get_name() == name)
+            .ok_or_else(|| "Device not found".to_string())?;
+
+        self.devices.remove(index);
+        Ok(())
+    }
+
     pub fn get_devices(self) -> Vec<Box<dyn Device>> {
         self.devices
     }
@@ -144,7 +155,7 @@ mod tests {
     use mockall::predicate::eq;
 
     use crate::{
-        adapters::primary_device::MockGlobalConfigProvider,
+        adapters::{operations::device, primary_device::MockGlobalConfigProvider},
         core::{
             device_factories_registry::DeviceFactoryRegistry,
             test_utils::mocks::{
@@ -487,5 +498,32 @@ type = "MockDeviceWithParameters"
         };
 
         global_config.save(&config_provider).unwrap();
+    }
+
+    #[test]
+    fn when_removing_device_from_global_config_it_shall_remove_it() {
+        let mut global_config = GlobalConfig { devices: vec![] };
+
+        let device1 = MockDevice::new("MyPersonalDevice");
+        let device2 = MockDevice::new("MySecondPersonalDevice");
+
+        global_config.add_device(Box::new(device1)).unwrap();
+        global_config.add_device(Box::new(device2)).unwrap();
+        assert_eq!(global_config.devices.len(), 2);
+
+        global_config.remove_device("MyPersonalDevice").unwrap();
+        assert_eq!(global_config.devices.len(), 1);
+        assert_eq!(
+            global_config.devices[0].get_name(),
+            "MySecondPersonalDevice"
+        );
+    }
+
+    #[test]
+    fn when_removing_non_existant_device_it_shall_return_error() {
+        let mut global_config = GlobalConfig { devices: vec![] };
+        let result = global_config.remove_device("NonExistantDevice");
+        assert!(result.is_err());
+        assert_eq!(result.err().unwrap(), "Device not found");
     }
 }
