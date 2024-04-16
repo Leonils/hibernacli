@@ -44,7 +44,7 @@ pub mod device {
 
         /// List all devices
         /// The list is sorted by the device name
-        fn list(&self) -> Vec<Box<dyn Device>>;
+        fn list(&self) -> Result<Vec<Box<dyn Device>>, String>;
     }
 }
 
