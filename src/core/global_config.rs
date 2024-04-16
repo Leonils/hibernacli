@@ -52,7 +52,7 @@ impl GlobalConfig {
         config_provider: &dyn GlobalConfigProvider,
         device_factories_registry: &DeviceFactoryRegistry,
     ) -> Result<GlobalConfig, String> {
-        let config_toml = config_provider.read_global_config_dir()?;
+        let config_toml = config_provider.read_global_config()?;
 
         let (errors, devices) = toml::from_str::<PartiallyParsedGlobalConfig>(&config_toml)
             .map_err(|e| e.to_string())?
@@ -87,9 +87,7 @@ impl GlobalConfig {
         })
         .map_err(|e| e.to_string())?;
 
-        config_provider
-            .write_global_config_dir(&config_toml)
-            .unwrap();
+        config_provider.write_global_config(&config_toml).unwrap();
 
         Ok(())
     }
@@ -155,7 +153,7 @@ mod tests {
     use mockall::predicate::eq;
 
     use crate::{
-        adapters::{operations::device, primary_device::MockGlobalConfigProvider},
+        adapters::primary_device::MockGlobalConfigProvider,
         core::{
             device_factories_registry::DeviceFactoryRegistry,
             test_utils::mocks::{
@@ -445,7 +443,7 @@ mod tests {
     fn when_saving_config_it_shall_call_save_on_config_provider() {
         let mut config_provider = MockGlobalConfigProvider::new();
         config_provider
-            .expect_write_global_config_dir()
+            .expect_write_global_config()
             .times(1)
             .with(eq(""))
             .return_const(Ok(()));
@@ -458,7 +456,7 @@ mod tests {
     fn when_saving_config_with_some_devices_it_shall_save_config_with_devices() {
         let mut config_provider = MockGlobalConfigProvider::new();
         config_provider
-            .expect_write_global_config_dir()
+            .expect_write_global_config()
             .times(1)
             .with(eq(r#"[[devices]]
 name = "MockDevice"
@@ -478,7 +476,7 @@ type = "MockDevice"
     fn when_saving_config_with_multiple_devices_it_shall_save_config_with_devices() {
         let mut config_provider = MockGlobalConfigProvider::new();
         config_provider
-            .expect_write_global_config_dir()
+            .expect_write_global_config()
             .times(1)
             .with(eq(r#"[[devices]]
 name = "MockDevice"

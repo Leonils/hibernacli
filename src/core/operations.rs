@@ -204,10 +204,10 @@ type = "MockDevice"
 
         let mut provider = MockGlobalConfigProvider::new();
         provider
-            .expect_read_global_config_dir()
+            .expect_read_global_config()
             .return_const(Ok(r#""#.to_string()));
         provider
-            .expect_write_global_config_dir()
+            .expect_write_global_config()
             .times(1)
             .with(eq(r#"[[devices]]
 name = "MockDevice"
@@ -236,14 +236,14 @@ type = "MockDevice"
 
         let mut provider = MockGlobalConfigProvider::new();
         provider
-            .expect_read_global_config_dir()
+            .expect_read_global_config()
             .return_const(Ok(r#"[[devices]]
 name = "AnotherDevice"
 type = "MockDevice"
 "#
             .to_string()));
         provider
-            .expect_write_global_config_dir()
+            .expect_write_global_config()
             .times(1)
             .with(eq(r#"[[devices]]
 name = "AnotherDevice"
@@ -276,7 +276,7 @@ type = "MockDevice"
 
         let mut provider = MockGlobalConfigProvider::new();
         provider
-            .expect_read_global_config_dir()
+            .expect_read_global_config()
             .return_const(Ok(r#"[[devices]]
 name = "AnotherDevice"
 type = "MockDevice"
@@ -284,7 +284,7 @@ type = "MockDevice"
             .to_string()));
 
         provider
-            .expect_write_global_config_dir()
+            .expect_write_global_config()
             .times(1)
             .with(eq(r#""#.to_string()))
             .return_const(Ok(()));
