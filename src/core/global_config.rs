@@ -69,6 +69,11 @@ struct PartiallyParsedGlobalConfig {
     devices: Option<Vec<Table>>,
 }
 
+#[derive(serde::Deserialize, serde::Serialize, Debug, Default)]
+struct PartiallyParsedProjectGlobalConfig {
+    projects: Option<Vec<Table>>,
+}
+
 impl GlobalConfig {
     pub fn load(
         config_provider: &dyn GlobalConfigProvider,
@@ -87,13 +92,20 @@ impl GlobalConfig {
             .into_iter()
             .partition_map(From::from);
 
+        let projects = toml::from_str::<PartiallyParsedProjectGlobalConfig>(&config_toml)
+            .map_err(|e| e.to_string())?
+            .projects
+            .unwrap_or(vec![])
+            .into_iter()
+            .map(|project_table| -> Result<Project, String> {
+                Self::load_project_from_toml_bloc(project_table)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
         Self::assert_no_errors_in_devices(&errors)?;
         Self::assert_no_duplicate_device(&devices)?;
 
-        Ok(GlobalConfig {
-            devices,
-            projects: vec![Project::new("MyProject".to_string(), "/tmp".to_string())],
-        })
+        Ok(GlobalConfig { devices, projects })
     }
 
     pub fn save(&self, config_provider: &dyn GlobalConfigProvider) -> Result<(), String> {
@@ -139,6 +151,12 @@ impl GlobalConfig {
 
         let device = factory.build_from_toml_table(&name, &device_table)?;
         Ok(device)
+    }
+
+    fn load_project_from_toml_bloc(
+        project_table: toml::map::Map<String, toml::Value>,
+    ) -> Result<Project, String> {
+        Ok(Project::new("name".to_string(), "location".to_string()))
     }
 
     fn assert_no_errors_in_devices(errors: &Vec<String>) -> Result<(), String> {
@@ -255,7 +273,7 @@ mod tests {
     }
 
     #[test]
-    fn when_retrieving_confog_with_one_project_it_shall_have_one_project_in_global_config() {
+    fn when_retrieving_config_with_one_project_it_shall_have_one_project_in_global_config() {
         let device_factories_registry = get_mock_device_factory_registry();
         let config_provider = MockGlobalConfigProviderFactory::new(
             r#"
@@ -266,6 +284,24 @@ mod tests {
         );
         let config = GlobalConfig::load(&config_provider, &device_factories_registry).unwrap();
         assert_eq!(config.projects.len(), 1);
+    }
+
+    #[test]
+    fn when_retrieving_config_with_multiple_project_it_should_have_the_project_in_global_config() {
+        let device_factories_registry = get_mock_device_factory_registry();
+        let config_provider = MockGlobalConfigProviderFactory::new(
+            r#"
+    [[projects]]
+    name = "MyProject"
+    path = "/tmp"
+
+        [[projects]]
+    name = "MySecondAwesomeProject"
+    path = "/tmp"
+    "#,
+        );
+        let config = GlobalConfig::load(&config_provider, &device_factories_registry).unwrap();
+        assert_eq!(config.projects.len(), 2);
     }
 
     #[test]
@@ -381,6 +417,7 @@ mod tests {
         );
         assert_eq!(config.devices[1].get_name(), "MySecondPersonalDevice");
     }
+
     #[test]
     fn when_a_type_with_additional_parameters_has_a_missing_parameter_it_should_propagate_error() {
         let registry = get_mock_device_factory_registry();
