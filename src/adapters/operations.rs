@@ -1,13 +1,3 @@
-mod help {
-    pub trait HelpOperations {
-        /// Get an help for the struct implementing this trait
-        fn help(&self) -> String;
-
-        /// Get an help for a specific command of the struct implementing this trait
-        fn help_command(&self, command: String) -> String;
-    }
-}
-
 pub mod device {
     use crate::models::secondary_device::{Device, DeviceFactory, DeviceFactoryKey};
 
