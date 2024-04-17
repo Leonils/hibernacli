@@ -150,6 +150,8 @@ impl GlobalConfig {
 
 #[cfg(test)]
 mod tests {
+    use std::rc::Rc;
+
     use mockall::predicate::eq;
 
     use crate::{
@@ -171,12 +173,12 @@ mod tests {
         registry.register_device(
             "MockDevice".to_string(),
             "MockDevice".to_string(),
-            Box::new(MockDeviceFactory),
+            Rc::new(MockDeviceFactory),
         );
         registry.register_device(
             "MockDeviceWithParameters".to_string(),
             "MockDeviceWithParameters".to_string(),
-            Box::new(MockDeviceWithParametersFactory),
+            Rc::new(MockDeviceWithParametersFactory),
         );
         registry
     }
