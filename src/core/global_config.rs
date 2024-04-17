@@ -156,7 +156,19 @@ impl GlobalConfig {
     fn load_project_from_toml_bloc(
         project_table: toml::map::Map<String, toml::Value>,
     ) -> Result<Project, String> {
-        Ok(Project::new("name".to_string(), "location".to_string()))
+        let name = project_table
+            .get("name")
+            .ok_or_else(|| "Missing name for project".to_string())?
+            .as_str()
+            .ok_or_else(|| "Invalid string for name".to_string())?;
+
+        let path = project_table
+            .get("path")
+            .ok_or_else(|| "Missing path for project".to_string())?
+            .as_str()
+            .ok_or_else(|| "Invalid string for path".to_string())?;
+
+        Ok(Project::new(name.to_string(), path.to_string()))
     }
 
     fn assert_no_errors_in_devices(errors: &Vec<String>) -> Result<(), String> {
@@ -318,6 +330,53 @@ mod tests {
         assert_eq!(config.devices.len(), 1);
         assert_eq!(config.devices[0].get_device_type_name(), "MockDevice");
         assert_eq!(config.devices[0].get_name(), "MyPersonalDevice");
+    }
+
+    #[test]
+    fn when_retrieving_config_with_different_name_it_shall_be_reflected_in_project() {
+        let device_factories_registry = get_mock_device_factory_registry();
+        let config_provider = MockGlobalConfigProviderFactory::new(
+            r#"
+    [[projects]]
+    name = "MyProject"
+    path = "/tmp"
+    "#,
+        );
+        let config = GlobalConfig::load(&config_provider, &device_factories_registry).unwrap();
+        assert_eq!(config.projects.len(), 1);
+        assert_eq!(config.projects[0].get_name(), "MyProject");
+        assert_eq!(config.projects[0].get_location(), "/tmp");
+    }
+
+    #[test]
+    fn when_retrieving_config_with_random_name_it_shall_be_reflected_in_project() {
+        let device_factories_registry = get_mock_device_factory_registry();
+        let config_provider = MockGlobalConfigProviderFactory::new(
+            r#"
+    [[projects]]
+    name = "ergergerger"
+    path = "/tmp"
+    "#,
+        );
+        let config = GlobalConfig::load(&config_provider, &device_factories_registry).unwrap();
+        assert_eq!(config.projects.len(), 1);
+        assert_eq!(config.projects[0].get_name(), "ergergerger");
+        assert_eq!(config.projects[0].get_location(), "/tmp");
+    }
+    #[test]
+    fn when_retrieving_config_with_random_path_it_shall_be_reflected_in_project() {
+        let device_factories_registry = get_mock_device_factory_registry();
+        let config_provider = MockGlobalConfigProviderFactory::new(
+            r#"
+    [[projects]]
+    name = "MyProject"
+    path = "/gerger/gerg/zfer/zgze"
+    "#,
+        );
+        let config = GlobalConfig::load(&config_provider, &device_factories_registry).unwrap();
+        assert_eq!(config.projects.len(), 1);
+        assert_eq!(config.projects[0].get_name(), "MyProject");
+        assert_eq!(config.projects[0].get_location(), "/gerger/gerg/zfer/zgze");
     }
 
     #[test]
