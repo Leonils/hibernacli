@@ -2,7 +2,7 @@ use crate::adapters::primary_device::GlobalConfigProvider;
 use directories::ProjectDirs;
 use std::path::{Path, PathBuf};
 
-struct LocalFileStorage<'a> {
+pub struct LocalFileStorage<'a> {
     config_dir: Box<Path>,
     file_system: &'a dyn FileSystem,
     default_config: &'a str,
@@ -66,7 +66,7 @@ trait PathProvider {
     fn get_config_dir(&self, project_name: &str) -> Option<Box<Path>>;
 }
 
-struct StandardPathProvider;
+pub struct StandardPathProvider;
 impl PathProvider for StandardPathProvider {
     fn get_config_dir(&self, project_name: &str) -> Option<Box<Path>> {
         let project_dir = ProjectDirs::from("", "", project_name)?;
@@ -74,13 +74,13 @@ impl PathProvider for StandardPathProvider {
     }
 }
 
-trait FileSystem {
+pub trait FileSystem {
     fn write_file(&self, file_path: PathBuf, content: &str) -> Result<(), String>;
     fn read_file(&self, _file_path: PathBuf) -> Result<String, String>;
     fn create_dir_all(&self, dir_path: PathBuf) -> Result<(), String>;
 }
 
-struct StandardFileSystem;
+pub struct StandardFileSystem;
 impl FileSystem for StandardFileSystem {
     fn write_file(&self, file_path: PathBuf, content: &str) -> Result<(), String> {
         std::fs::write(file_path, content).map_err(|e| e.to_string())

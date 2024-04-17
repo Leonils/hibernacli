@@ -7,12 +7,12 @@ use crate::{
 
 use super::{device_factories_registry::DeviceFactoryRegistry, global_config::GlobalConfig};
 
-struct Operations {
+pub struct Operations {
     device_factory_registry: DeviceFactoryRegistry,
     global_config_provider: Box<dyn GlobalConfigProvider>,
 }
 impl Operations {
-    fn new(global_config_provider: Box<dyn GlobalConfigProvider>) -> Self {
+    pub fn new(global_config_provider: Box<dyn GlobalConfigProvider>) -> Self {
         Operations {
             device_factory_registry: DeviceFactoryRegistry::new(),
             global_config_provider,
