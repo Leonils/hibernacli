@@ -1,10 +1,10 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, rc::Rc};
 
 use crate::models::secondary_device::{DeviceFactory, DeviceFactoryKey};
 
 pub struct DeviceFactoryBox {
     name: String,
-    factory: Box<dyn DeviceFactory>,
+    factory: Rc<dyn DeviceFactory>,
 }
 
 pub struct DeviceFactoryRegistry {
@@ -22,7 +22,7 @@ impl DeviceFactoryRegistry {
         &mut self,
         device_factory_key: String,
         device_factory_readable_name: String,
-        device_factory: Box<dyn DeviceFactory>,
+        device_factory: Rc<dyn DeviceFactory>,
     ) {
         self.devices.insert(
             device_factory_key.clone(),
@@ -33,10 +33,10 @@ impl DeviceFactoryRegistry {
         );
     }
 
-    pub fn get_device_factory(&self, device_factory_key: &str) -> Option<&Box<dyn DeviceFactory>> {
+    pub fn get_device_factory(&self, device_factory_key: &str) -> Option<Rc<dyn DeviceFactory>> {
         self.devices
             .get(device_factory_key)
-            .map(|device_factory_box| &device_factory_box.factory)
+            .map(|device_factory_box| device_factory_box.factory.clone())
     }
 
     pub fn list_factories(&self) -> Vec<DeviceFactoryKey> {
@@ -69,7 +69,7 @@ mod test {
         registry.register_device(
             "MockDevice".to_string(),
             "A mock device".to_string(),
-            Box::new(MockDeviceFactory),
+            Rc::new(MockDeviceFactory),
         );
 
         let device_factory = registry.get_device_factory("MockDevice");
@@ -93,7 +93,7 @@ mod test {
         registry.register_device(
             "MockDevice".to_string(),
             "A mock device".to_string(),
-            Box::new(MockDeviceFactory),
+            Rc::new(MockDeviceFactory),
         );
 
         let factories = registry.list_factories();
