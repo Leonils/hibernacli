@@ -92,7 +92,7 @@ impl GlobalConfig {
 
         Ok(GlobalConfig {
             devices,
-            projects: vec![],
+            projects: vec![Project::new("MyProject".to_string(), "/tmp".to_string())],
         })
     }
 
@@ -252,6 +252,20 @@ mod tests {
         assert_eq!(config.devices.len(), 1);
         assert_eq!(config.devices[0].get_device_type_name(), "MockDevice");
         assert_eq!(config.devices[0].get_name(), "MockDevice");
+    }
+
+    #[test]
+    fn when_retrieving_confog_with_one_project_it_shall_have_one_project_in_global_config() {
+        let device_factories_registry = get_mock_device_factory_registry();
+        let config_provider = MockGlobalConfigProviderFactory::new(
+            r#"
+    [[projects]]
+    name = "MyProject"
+    path = "/tmp"
+    "#,
+        );
+        let config = GlobalConfig::load(&config_provider, &device_factories_registry).unwrap();
+        assert_eq!(config.projects.len(), 1);
     }
 
     #[test]
