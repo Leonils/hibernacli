@@ -19,7 +19,7 @@ impl Operations {
         }
     }
 
-    fn register_device_factory(
+    pub fn register_device_factory(
         &mut self,
         device_factory_key: String,
         device_factory_readable_name: String,

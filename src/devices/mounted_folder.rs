@@ -48,7 +48,7 @@ impl Device for MountedFolder {
     }
 }
 
-struct MountedFolderFactory {
+pub struct MountedFolderFactory {
     path_question: Question,
     name_question: Question,
     step: u8,

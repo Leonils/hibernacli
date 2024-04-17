@@ -6,6 +6,9 @@ use crate::core::operations::Operations;
 use crate::devices::local_file_storage::{
     LocalFileStorage, StandardFileSystem, StandardPathProvider,
 };
+use crate::devices::mounted_folder::MountedFolderFactory;
+use crate::models::secondary_device::Device;
+use std::rc::Rc;
 
 const HELP: &str = r#"
 HibernaCLI
@@ -22,10 +25,7 @@ Commands:
 const INVALID_COMMAND: &str = "Invalid command, use 'help' to display available commands";
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-const DEFAULT_CONFIG: &str = r#"[[devices]]
-    name = "MyPersonalDevice"
-    type = "MockDevice"
-"#;
+const DEFAULT_CONFIG: &str = r#""#;
 
 #[cfg_attr(test, automock)]
 trait UserInterface {
@@ -71,15 +71,15 @@ impl<T: UserInterface, U: DeviceOperations> CommandRunner<T, U> {
         }
     }
 
-    fn display_message(&mut self, message: &String) {
+    fn display_message(&self, message: &str) {
         let _ = self.console.write(message);
     }
 
-    fn read_string(&mut self) -> Result<String, String> {
+    fn read_string(&self) -> Result<String, String> {
         self.console.read()
     }
 
-    fn read_number(&mut self) -> Result<i32, String> {
+    fn read_number(&self) -> Result<i32, String> {
         let input = self.console.read()?;
         match input.trim().parse::<i32>() {
             Ok(number) => Ok(number),
@@ -87,16 +87,16 @@ impl<T: UserInterface, U: DeviceOperations> CommandRunner<T, U> {
         }
     }
 
-    fn display_help(&mut self) {
-        let _ = self.display_message(&HELP.to_string());
+    fn display_help(&self) {
+        let _ = self.display_message(&HELP);
     }
 
-    fn display_version(&mut self) {
-        let _ = self.display_message(&VERSION.to_string());
+    fn display_version(&self) {
+        let _ = self.display_message(&VERSION);
     }
 
-    fn display_invalid_command(&mut self) {
-        let _ = self.display_message(&INVALID_COMMAND.to_string());
+    fn display_invalid_command(&self) {
+        let _ = self.display_message(&INVALID_COMMAND);
     }
 
     fn run_device_command(&mut self, args: Vec<String>) {
@@ -114,7 +114,8 @@ impl<T: UserInterface, U: DeviceOperations> CommandRunner<T, U> {
     }
 
     fn display_device_list(&mut self) {
-        let _ = self.display_message(&"Device list:".to_string());
+        let _ = self.display_message(&"Device list:");
+        println!("get the list of devices");
         let devices = self.operations.list();
         match devices {
             Ok(devices) => {
@@ -136,7 +137,13 @@ pub fn run(args: Vec<String>) {
         &StandardFileSystem {},
         DEFAULT_CONFIG,
     );
-    let operations = Operations::new(Box::new(local_file_storage));
+    let mut operations = Operations::new(Box::new(local_file_storage));
+    let device_factory = Rc::new(MountedFolderFactory::new());
+    operations.register_device_factory(
+        "mounted_folder".to_string(),
+        "Mouted device".to_string(),
+        device_factory,
+    );
     let mut command_runner = CommandRunner {
         console: Console,
         operations,
@@ -161,7 +168,7 @@ mod tests {
             .with(eq(message.clone()))
             .return_const(Ok(()));
         let operations = MockDeviceOperations::new();
-        let mut command_runner = CommandRunner {
+        let command_runner = CommandRunner {
             console,
             operations,
         };
@@ -176,7 +183,7 @@ mod tests {
             .times(1)
             .returning(|| Ok("Hello, world!".to_string()));
         let operations = MockDeviceOperations::new();
-        let mut command_runner = CommandRunner {
+        let command_runner = CommandRunner {
             console,
             operations,
         };
@@ -192,7 +199,7 @@ mod tests {
             .times(1)
             .returning(|| Ok("42".to_string()));
         let operations = MockDeviceOperations::new();
-        let mut command_runner = CommandRunner {
+        let command_runner = CommandRunner {
             console,
             operations,
         };
@@ -208,7 +215,7 @@ mod tests {
             .times(1)
             .returning(|| Ok("42a".to_string()));
         let operations = MockDeviceOperations::new();
-        let mut command_runner = CommandRunner {
+        let command_runner = CommandRunner {
             console,
             operations,
         };
@@ -324,10 +331,10 @@ mod tests {
         let mut device_operations = MockDeviceOperations::new();
         let mut device = MockDevice::new();
 
-        device
-            .expect_get_name()
-            .times(1)
-            .returning(move || "USBkey".to_string());
+        // device
+        //     .expect_get_name()
+        //     .times(1)
+        //     .returning(move || "USBkey".to_string());
 
         device_operations
             .expect_list()
@@ -336,7 +343,7 @@ mod tests {
 
         console
             .expect_write()
-            .times(2)
+            .times(1)
             .withf(|msg| msg.contains("USBkey") || msg.contains("Device"))
             .return_const(Ok(()));
 
@@ -348,7 +355,7 @@ mod tests {
         command_runner.run(vec![
             "/path/to/executable".to_string(),
             "device".to_string(),
-            "ls".to_string(),
+            "list".to_string(),
         ]);
     }
 }

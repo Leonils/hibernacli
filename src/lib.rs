@@ -33,7 +33,7 @@ pub mod adapters {
 
 mod devices {
     pub mod local_file_storage;
-    mod mounted_folder;
+    pub mod mounted_folder;
 }
 
 pub mod cli;
