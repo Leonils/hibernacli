@@ -27,20 +27,20 @@ const DEFAULT_CONFIG: &str = r#"[[devices]]
     type = "MockDevice"
 "#;
 
+#[cfg_attr(test, automock)]
 trait UserInterface {
-    fn write(&mut self, message: String) -> Result<(), String>;
-    fn read(&mut self) -> Result<String, String>;
+    fn write(&self, message: &str) -> Result<(), String>;
+    fn read(&self) -> Result<String, String>;
 }
 
 struct Console;
 
-#[cfg_attr(test, automock)]
 impl UserInterface for Console {
-    fn write(&mut self, message: String) -> Result<(), String> {
+    fn write(&self, message: &str) -> Result<(), String> {
         println!("{}", message);
         Ok(())
     }
-    fn read(&mut self) -> Result<String, String> {
+    fn read(&self) -> Result<String, String> {
         let mut buffer = String::new();
         match std::io::stdin().read_line(&mut buffer) {
             Ok(_) => return Ok(buffer),
@@ -72,7 +72,7 @@ impl<T: UserInterface, U: DeviceOperations> CommandRunner<T, U> {
     }
 
     fn display_message(&mut self, message: &String) {
-        let _ = self.console.write(message.to_string());
+        let _ = self.console.write(message);
     }
 
     fn read_string(&mut self) -> Result<String, String> {
@@ -153,7 +153,7 @@ mod tests {
 
     #[test]
     fn test_display_message() {
-        let mut console = MockConsole::new();
+        let mut console = MockUserInterface::new();
         let mut message = "Hello, world!".to_string();
         console
             .expect_write()
@@ -170,7 +170,7 @@ mod tests {
 
     #[test]
     fn test_read_string() {
-        let mut console = MockConsole::new();
+        let mut console = MockUserInterface::new();
         console
             .expect_read()
             .times(1)
@@ -186,7 +186,7 @@ mod tests {
 
     #[test]
     fn test_read_number() {
-        let mut console = MockConsole::new();
+        let mut console = MockUserInterface::new();
         console
             .expect_read()
             .times(1)
@@ -202,7 +202,7 @@ mod tests {
 
     #[test]
     fn should_fail_for_a_number_with_letters() {
-        let mut console = MockConsole::new();
+        let mut console = MockUserInterface::new();
         console
             .expect_read()
             .times(1)
@@ -218,7 +218,7 @@ mod tests {
 
     #[test]
     fn display_help() {
-        let mut console = MockConsole::new();
+        let mut console = MockUserInterface::new();
         console
             .expect_write()
             .times(1)
@@ -234,7 +234,7 @@ mod tests {
 
     #[test]
     fn display_help_when_running_with_help_command() {
-        let mut console = MockConsole::new();
+        let mut console = MockUserInterface::new();
         console
             .expect_write()
             .times(1)
@@ -250,7 +250,7 @@ mod tests {
 
     #[test]
     fn display_invalid_command() {
-        let mut console = MockConsole::new();
+        let mut console = MockUserInterface::new();
         console
             .expect_write()
             .times(1)
@@ -269,7 +269,7 @@ mod tests {
 
     #[test]
     fn display_invalid_command_when_running_with_no_args() {
-        let mut console = MockConsole::new();
+        let mut console = MockUserInterface::new();
         console
             .expect_write()
             .times(1)
@@ -285,7 +285,7 @@ mod tests {
 
     #[test]
     fn display_version_with_full_version_command() {
-        let mut console = MockConsole::new();
+        let mut console = MockUserInterface::new();
         console
             .expect_write()
             .times(1)
@@ -304,7 +304,7 @@ mod tests {
 
     #[test]
     fn display_version_with_short_version_command() {
-        let mut console = MockConsole::new();
+        let mut console = MockUserInterface::new();
         console
             .expect_write()
             .times(1)
@@ -320,7 +320,7 @@ mod tests {
 
     #[test]
     fn display_list_of_devices() {
-        let mut console = MockConsole::new();
+        let mut console = MockUserInterface::new();
         let mut device_operations = MockDeviceOperations::new();
         let mut device = MockDevice::new();
 
