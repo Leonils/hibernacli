@@ -1,12 +1,16 @@
 use itertools::Itertools;
 use toml::Table;
 
-use crate::{adapters::primary_device::GlobalConfigProvider, models::secondary_device::Device};
+use crate::{
+    adapters::primary_device::GlobalConfigProvider,
+    models::{project::Project, secondary_device::Device},
+};
 
 use super::device_factories_registry::DeviceFactoryRegistry;
 
 pub struct GlobalConfig {
     devices: Vec<Box<dyn Device>>,
+    projects: Vec<Project>,
 }
 
 impl GlobalConfig {
@@ -42,6 +46,24 @@ impl GlobalConfig {
     }
 }
 
+impl GlobalConfig {
+    fn get_project_by_name(&self, name: &str) -> Option<&Project> {
+        unimplemented!()
+    }
+
+    pub fn add_project(&mut self, project: Project) -> Result<(), String> {
+        unimplemented!()
+    }
+
+    pub fn remove_project(&mut self, name: &str) -> Result<(), String> {
+        unimplemented!()
+    }
+
+    pub fn get_projects(self) -> Vec<Project> {
+        unimplemented!()
+    }
+}
+
 #[derive(serde::Deserialize, serde::Serialize, Debug, Default)]
 struct PartiallyParsedGlobalConfig {
     devices: Option<Vec<Table>>,
@@ -68,7 +90,10 @@ impl GlobalConfig {
         Self::assert_no_errors_in_devices(&errors)?;
         Self::assert_no_duplicate_device(&devices)?;
 
-        Ok(GlobalConfig { devices })
+        Ok(GlobalConfig {
+            devices,
+            projects: vec![],
+        })
     }
 
     pub fn save(&self, config_provider: &dyn GlobalConfigProvider) -> Result<(), String> {
@@ -203,6 +228,14 @@ mod tests {
         let config_provider = MockGlobalConfigProviderFactory::new("");
         let config = GlobalConfig::load(&config_provider, &device_factories_registry).unwrap();
         assert_eq!(config.devices.len(), 0);
+    }
+
+    #[test]
+    fn when_retrieving_config_with_no_project_it_shall_have_no_project_in_global_config() {
+        let device_factories_registry = get_mock_device_factory_registry();
+        let config_provider = MockGlobalConfigProviderFactory::new("");
+        let config = GlobalConfig::load(&config_provider, &device_factories_registry).unwrap();
+        assert_eq!(config.projects.len(), 0);
     }
 
     #[test]
@@ -403,7 +436,10 @@ mod tests {
 
     #[test]
     fn when_adding_device_to_global_config_it_shall_add_it() {
-        let mut global_config = GlobalConfig { devices: vec![] };
+        let mut global_config = GlobalConfig {
+            devices: vec![],
+            projects: vec![],
+        };
 
         let device = MockDeviceFactory
             .build_from_toml_table("MyPersonalDevice", &toml::Table::new())
@@ -416,7 +452,10 @@ mod tests {
 
     #[test]
     fn when_adding_device_to_global_config_if_device_already_exists_it_shall_return_error() {
-        let mut global_config = GlobalConfig { devices: vec![] };
+        let mut global_config = GlobalConfig {
+            devices: vec![],
+            projects: vec![],
+        };
 
         let device = MockDeviceFactory
             .build_from_toml_table("MyPersonalDevice", &toml::Table::new())
@@ -448,7 +487,10 @@ mod tests {
             .with(eq(""))
             .return_const(Ok(()));
 
-        let global_config = GlobalConfig { devices: vec![] };
+        let global_config = GlobalConfig {
+            devices: vec![],
+            projects: vec![],
+        };
         global_config.save(&config_provider).unwrap();
     }
 
@@ -467,6 +509,7 @@ type = "MockDevice"
         let device = MockDeviceFactory.build().unwrap();
         let global_config = GlobalConfig {
             devices: vec![device],
+            projects: vec![],
         };
 
         global_config.save(&config_provider).unwrap();
@@ -493,6 +536,7 @@ type = "MockDeviceWithParameters"
         let device2 = MockDeviceWithParameters::new("MyDevice", "MyParameter");
         let global_config = GlobalConfig {
             devices: vec![Box::new(device1), Box::new(device2)],
+            projects: vec![],
         };
 
         global_config.save(&config_provider).unwrap();
@@ -500,7 +544,10 @@ type = "MockDeviceWithParameters"
 
     #[test]
     fn when_removing_device_from_global_config_it_shall_remove_it() {
-        let mut global_config = GlobalConfig { devices: vec![] };
+        let mut global_config = GlobalConfig {
+            devices: vec![],
+            projects: vec![],
+        };
 
         let device1 = MockDevice::new("MyPersonalDevice");
         let device2 = MockDevice::new("MySecondPersonalDevice");
@@ -519,7 +566,10 @@ type = "MockDeviceWithParameters"
 
     #[test]
     fn when_removing_non_existant_device_it_shall_return_error() {
-        let mut global_config = GlobalConfig { devices: vec![] };
+        let mut global_config = GlobalConfig {
+            devices: vec![],
+            projects: vec![],
+        };
         let result = global_config.remove_device("NonExistantDevice");
         assert!(result.is_err());
         assert_eq!(result.err().unwrap(), "Device not found");
