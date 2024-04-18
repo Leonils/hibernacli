@@ -12,7 +12,7 @@ use crate::{
     },
 };
 
-use super::device_factories_registry::DeviceFactoryRegistry;
+use super::{config::toml::TryRead, device_factories_registry::DeviceFactoryRegistry};
 
 pub struct GlobalConfig {
     devices: Vec<Box<dyn Device>>,
@@ -113,7 +113,7 @@ impl GlobalConfig {
         let (device_errors, devices) = Self::from_toml_load_tables_of(
             parsed_config.devices,
             |device_table| -> Result<Box<dyn Device>, String> {
-                Self::load_device_from_toml_bloc(device_table, &device_factories_registry)
+                Self::load_device_from_toml_bloc(&device_table, &device_factories_registry)
             },
         );
 
@@ -122,7 +122,14 @@ impl GlobalConfig {
             Self::load_project_from_toml_bloc,
         );
 
-        Self::assert_no_errors_in_config(&[device_errors, project_errors].concat())?;
+        Self::assert_no_errors_in_config(
+            &device_errors,
+            "Errors while reading devices from config",
+        )?;
+        Self::assert_no_errors_in_config(
+            &project_errors,
+            "Errors while reading projects from config",
+        )?;
         Self::assert_no_duplicate_device(&devices)?;
         Self::assert_no_duplicate_project_name(&projects)?;
         Self::assert_no_duplicate_project_path(&projects)?;
@@ -165,9 +172,10 @@ impl GlobalConfig {
     }
 
     fn load_device_from_toml_bloc(
-        device_table: toml::map::Map<String, toml::Value>,
+        device_table: &Table,
         device_factories_registry: &DeviceFactoryRegistry,
     ) -> Result<Box<dyn Device>, String> {
+        let name: &str = device_table.try_read("name")?;
         let name = device_table
             .get("name")
             .ok_or_else(|| "Missing name for device".to_string())?
@@ -218,9 +226,12 @@ impl GlobalConfig {
         ))
     }
 
-    fn assert_no_errors_in_config(errors: &Vec<String>) -> Result<(), String> {
+    fn assert_no_errors_in_config(
+        errors: &Vec<String>,
+        prefix_if_errors: &str,
+    ) -> Result<(), String> {
         if !errors.is_empty() {
-            return Err(errors.join(", "));
+            return Err(format!("{}: {}", prefix_if_errors, errors.iter().join(", ")).to_string());
         }
 
         Ok(())
@@ -605,7 +616,10 @@ mod tests {
         );
         let config = GlobalConfig::load(&config_provider, &device_factories_registry);
         assert!(config.is_err());
-        assert_eq!(config.err().unwrap(), "Device factory not found");
+        assert_eq!(
+            config.err().unwrap(),
+            "Errors while reading devices from config: Device factory not found"
+        );
     }
 
     #[test]
@@ -619,7 +633,10 @@ mod tests {
         );
         let config = GlobalConfig::load(&config_provider, &device_factories_registry);
         assert!(config.is_err());
-        assert_eq!(config.err().unwrap(), "Missing name for device");
+        assert_eq!(
+            config.err().unwrap(),
+            "Errors while reading devices from config: Missing 'name' field"
+        );
     }
 
     #[test]
@@ -633,7 +650,10 @@ mod tests {
         );
         let config = GlobalConfig::load(&config_provider, &device_factories_registry);
         assert!(config.is_err());
-        assert_eq!(config.err().unwrap(), "Missing name for project");
+        assert_eq!(
+            config.err().unwrap(),
+            "Errors while reading projects from config: Missing name for project"
+        );
     }
 
     #[test]
@@ -647,7 +667,10 @@ mod tests {
         );
         let config = GlobalConfig::load(&config_provider, &device_factories_registry);
         assert!(config.is_err());
-        assert_eq!(config.err().unwrap(), "Missing path for project");
+        assert_eq!(
+            config.err().unwrap(),
+            "Errors while reading projects from config: Missing path for project"
+        );
     }
 
     #[test]
@@ -667,7 +690,7 @@ mod tests {
         assert!(config.is_err());
         assert_eq!(
             config.err().unwrap(),
-            "Missing name for device, Device factory not found"
+            "Errors while reading devices from config: Missing 'name' field, Device factory not found"
         );
     }
 
@@ -687,7 +710,7 @@ mod tests {
         assert!(config.is_err());
         assert_eq!(
             config.err().unwrap(),
-            "Missing path for project, Missing name for project"
+            "Errors while reading projects from config: Missing path for project, Missing name for project"
         );
     }
 
@@ -729,7 +752,10 @@ mod tests {
         );
         let config = GlobalConfig::load(&config_provider, &registry);
         assert!(config.is_err());
-        assert_eq!(config.err().unwrap(), "Missing parameter");
+        assert_eq!(
+            config.err().unwrap(),
+            "Errors while reading devices from config: Missing parameter"
+        );
     }
 
     #[test]
@@ -1021,7 +1047,10 @@ type = "MockDeviceWithParameters"
         );
         let config = GlobalConfig::load(&config_provider, &device_factories_registry);
         assert!(config.is_err());
-        assert_eq!(config.err().unwrap(), "No tracking status saved");
+        assert_eq!(
+            config.err().unwrap(),
+            "Errors while reading projects from config: No tracking status saved"
+        );
     }
 
     #[test]
@@ -1037,7 +1066,10 @@ type = "MockDeviceWithParameters"
         );
         let config = GlobalConfig::load(&config_provider, &device_factories_registry);
         assert!(config.is_err());
-        assert_eq!(config.err().unwrap(), "Unknown tracking status type");
+        assert_eq!(
+            config.err().unwrap(),
+            "Errors while reading projects from config: Unknown tracking status type"
+        );
     }
 
     #[test]
@@ -1106,7 +1138,7 @@ type = "MockDeviceWithParameters"
         assert!(config.is_err());
         assert_eq!(
             config.err().unwrap(),
-            "Missing backup_requirement_class section"
+            "Errors while reading projects from config: Missing backup_requirement_class section"
         );
     }
 

@@ -7,18 +7,18 @@ pub trait TryRead<'a, T> {
 impl<'a> TryRead<'a, &'a str> for &'a Table {
     fn try_read(&'a self, key: &'a str) -> Result<&'a str, String> {
         self.get(key)
-            .ok_or_else(|| format!("Missing {} field", key))?
+            .ok_or_else(|| format!("Missing '{}' field", key))?
             .as_str()
-            .ok_or_else(|| format!("Invalid string for {}", key))
+            .ok_or_else(|| format!("Invalid string for '{}'", key))
     }
 }
 impl<'a> TryRead<'a, u32> for &'a Table {
     fn try_read(&'a self, key: &'a str) -> Result<u32, String> {
         let v = self
             .get(key)
-            .ok_or_else(|| format!("Missing {} field", key))?
+            .ok_or_else(|| format!("Missing '{}' field", key))?
             .as_integer()
-            .ok_or_else(|| format!("Invalid format for {}", key))? as u32;
+            .ok_or_else(|| format!("Invalid format for '{}'", key))? as u32;
         Ok(v)
     }
 }
@@ -41,7 +41,7 @@ mod tests {
     fn test_try_read_str_missing() {
         let table = &Table::new();
         let v: Result<&str, _> = table.try_read("key");
-        assert_eq!(v.unwrap_err(), "Missing key field");
+        assert_eq!(v.unwrap_err(), "Missing 'key' field");
     }
 
     #[test]
@@ -50,7 +50,7 @@ mod tests {
         table.insert("key".to_string(), Value::Integer(42));
         let table = &table;
         let v: Result<&str, _> = table.try_read("key");
-        assert_eq!(v.unwrap_err(), "Invalid string for key");
+        assert_eq!(v.unwrap_err(), "Invalid string for 'key'");
     }
 
     #[test]
@@ -66,7 +66,7 @@ mod tests {
     fn test_try_read_u32_missing() {
         let table = &Table::new();
         let v: Result<u32, _> = table.try_read("key");
-        assert_eq!(v.unwrap_err(), "Missing key field");
+        assert_eq!(v.unwrap_err(), "Missing 'key' field");
     }
 
     #[test]
@@ -75,6 +75,6 @@ mod tests {
         table.insert("key".to_string(), Value::String("value".to_string()));
         let table = &table;
         let v: Result<u32, _> = table.try_read("key");
-        assert_eq!(v.unwrap_err(), "Invalid format for key");
+        assert_eq!(v.unwrap_err(), "Invalid format for 'key'");
     }
 }
