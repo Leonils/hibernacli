@@ -325,8 +325,7 @@ mod tests {
             .with(eq(HELP.to_string()))
             .return_const(());
         let device_operations = MockDeviceOperations::new();
-        let mut command_runner =
-            CommandRunner::new(console, &device_operations, &project_operations);
+        let command_runner = CommandRunner::new(console, &device_operations, &project_operations);
         command_runner.run(vec!["/path/to/executable".to_string(), "help".to_string()]);
     }
 
@@ -340,8 +339,7 @@ mod tests {
             .with(eq(INVALID_COMMAND.to_string()))
             .return_const(());
         let device_operations = MockDeviceOperations::new();
-        let mut command_runner =
-            CommandRunner::new(console, &device_operations, &project_operations);
+        let command_runner = CommandRunner::new(console, &device_operations, &project_operations);
         command_runner.run(vec![
             "/path/to/executable".to_string(),
             "invalid".to_string(),
@@ -358,8 +356,7 @@ mod tests {
             .with(eq(INVALID_COMMAND.to_string()))
             .return_const(());
         let device_operations = MockDeviceOperations::new();
-        let mut command_runner =
-            CommandRunner::new(console, &device_operations, &project_operations);
+        let command_runner = CommandRunner::new(console, &device_operations, &project_operations);
         command_runner.run(vec!["/path/to/executable".to_string()]);
     }
 
@@ -373,8 +370,7 @@ mod tests {
             .with(eq(VERSION.to_string()))
             .return_const(());
         let device_operations = MockDeviceOperations::new();
-        let mut command_runner =
-            CommandRunner::new(console, &device_operations, &project_operations);
+        let command_runner = CommandRunner::new(console, &device_operations, &project_operations);
         command_runner.run(vec![
             "/path/to/executable".to_string(),
             "--version".to_string(),
@@ -391,8 +387,7 @@ mod tests {
             .with(eq(VERSION.to_string()))
             .return_const(());
         let device_operations = MockDeviceOperations::new();
-        let mut command_runner =
-            CommandRunner::new(console, &device_operations, &project_operations);
+        let command_runner = CommandRunner::new(console, &device_operations, &project_operations);
         command_runner.run(vec!["/path/to/executable".to_string(), "-v".to_string()]);
     }
 
@@ -417,8 +412,7 @@ mod tests {
             .withf(|msg| msg.contains("USBkey") || msg.contains("Device"))
             .return_const(());
 
-        let mut command_runner =
-            CommandRunner::new(console, &device_operations, &project_operations);
+        let command_runner = CommandRunner::new(console, &device_operations, &project_operations);
         command_runner.run(vec![
             "/path/to/executable".to_string(),
             "device".to_string(),
@@ -436,8 +430,7 @@ mod tests {
             .with(eq(INVALID_COMMAND.to_string()))
             .return_const(());
         let device_operations = MockDeviceOperations::new();
-        let mut command_runner =
-            CommandRunner::new(console, &device_operations, &project_operations);
+        let command_runner = CommandRunner::new(console, &device_operations, &project_operations);
         command_runner.run(vec![
             "/path/to/executable".to_string(),
             "device".to_string(),
@@ -509,8 +502,7 @@ mod tests {
             .times(1)
             .return_const(Ok(()));
 
-        let mut command_runner =
-            CommandRunner::new(console, &device_operations, &project_operations);
+        let command_runner = CommandRunner::new(console, &device_operations, &project_operations);
 
         command_runner.run(vec![
             "/path/to/executable".to_string(),
@@ -585,8 +577,7 @@ mod tests {
             .times(1)
             .return_const(Ok(()));
 
-        let mut command_runner =
-            CommandRunner::new(console, &device_operations, &project_operations);
+        let command_runner = CommandRunner::new(console, &device_operations, &project_operations);
 
         command_runner.run(vec![
             "/path/to/executable".to_string(),
@@ -612,8 +603,7 @@ mod tests {
             .with(eq("USBkey".to_string()))
             .return_const(Ok(()));
 
-        let mut command_runner =
-            CommandRunner::new(console, &device_operations, &project_operations);
+        let command_runner = CommandRunner::new(console, &device_operations, &project_operations);
         command_runner.run(vec![
             "/path/to/executable".to_string(),
             "device".to_string(),
@@ -632,8 +622,7 @@ mod tests {
             .with(eq(INVALID_COMMAND.to_string()))
             .return_const(());
         let device_operations = MockDeviceOperations::new();
-        let mut command_runner =
-            CommandRunner::new(console, &device_operations, &project_operations);
+        let command_runner = CommandRunner::new(console, &device_operations, &project_operations);
         command_runner.run(vec![
             "/path/to/executable".to_string(),
             "device".to_string(),
@@ -655,8 +644,7 @@ mod tests {
             .with(eq("Project list:"))
             .return_const(());
         let device_operations = MockDeviceOperations::new();
-        let mut command_runner =
-            CommandRunner::new(console, &device_operations, &project_operations);
+        let command_runner = CommandRunner::new(console, &device_operations, &project_operations);
         command_runner.run(vec![
             "/path/to/executable".to_string(),
             "project".to_string(),
@@ -674,8 +662,7 @@ mod tests {
             .with(eq(INVALID_COMMAND.to_string()))
             .return_const(());
         let device_operations = MockDeviceOperations::new();
-        let mut command_runner =
-            CommandRunner::new(console, &device_operations, &project_operations);
+        let command_runner = CommandRunner::new(console, &device_operations, &project_operations);
         command_runner.run(vec![
             "/path/to/executable".to_string(),
             "project".to_string(),
