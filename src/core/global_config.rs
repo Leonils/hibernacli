@@ -97,10 +97,6 @@ impl GlobalConfig {
 #[derive(serde::Deserialize, serde::Serialize, Debug, Default)]
 struct PartiallyParsedGlobalConfig {
     devices: Option<Vec<Table>>,
-}
-
-#[derive(serde::Deserialize, serde::Serialize, Debug, Default)]
-struct PartiallyParsedProjectGlobalConfig {
     projects: Option<Vec<Table>>,
 }
 
@@ -111,33 +107,22 @@ impl GlobalConfig {
     ) -> Result<GlobalConfig, String> {
         let config_toml = config_provider.read_global_config()?;
 
-        let (device_errors, devices) = toml::from_str::<PartiallyParsedGlobalConfig>(&config_toml)
-            .map_err(|e| e.to_string())?
-            .devices
-            .unwrap_or(vec![])
-            .into_iter()
-            .map(|device_table| -> Result<Box<dyn Device>, String> {
+        let parsed_config = toml::from_str::<PartiallyParsedGlobalConfig>(&config_toml)
+            .map_err(|e| e.to_string())?;
+
+        let (device_errors, devices) = Self::from_toml_load_tables_of(
+            parsed_config.devices,
+            |device_table| -> Result<Box<dyn Device>, String> {
                 Self::load_device_from_toml_bloc(device_table, &device_factories_registry)
-            })
-            .into_iter()
-            .partition_map(From::from);
+            },
+        );
 
-        let (project_errors, projects): (Vec<String>, Vec<Project>) =
-            toml::from_str::<PartiallyParsedProjectGlobalConfig>(&config_toml)
-                .map_err(|e| e.to_string())?
-                .projects
-                .unwrap_or(vec![])
-                .into_iter()
-                .map(|project_table| -> Result<Project, String> {
-                    Self::load_project_from_toml_bloc(project_table)
-                })
-                .into_iter()
-                .partition_map(From::from);
+        let (project_errors, projects) = Self::from_toml_load_tables_of(
+            parsed_config.projects,
+            Self::load_project_from_toml_bloc,
+        );
 
-        let mut errors: Vec<String> = device_errors;
-        errors.extend(project_errors);
-
-        Self::assert_no_errors_in_config(&errors)?;
+        Self::assert_no_errors_in_config(&[device_errors, project_errors].concat())?;
         Self::assert_no_duplicate_device(&devices)?;
         Self::assert_no_duplicate_project_name(&projects)?;
         Self::assert_no_duplicate_project_path(&projects)?;
@@ -158,12 +143,25 @@ impl GlobalConfig {
             } else {
                 Some(device_tables)
             },
+            projects: None,
         })
         .map_err(|e| e.to_string())?;
 
         config_provider.write_global_config(&config_toml).unwrap();
 
         Ok(())
+    }
+
+    fn from_toml_load_tables_of<T>(
+        tables: Option<Vec<Table>>,
+        loader: impl Fn(Table) -> Result<T, String>,
+    ) -> (Vec<String>, Vec<T>) {
+        tables
+            .unwrap_or(vec![])
+            .into_iter()
+            .map(loader)
+            .into_iter()
+            .partition_map(From::from)
     }
 
     fn load_device_from_toml_bloc(
