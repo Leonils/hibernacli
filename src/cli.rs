@@ -21,12 +21,16 @@ Commands:
     --version or -v   Display the version of the application
     device [opt]      Manage devices
     config [opt]      Manage configuration
+
+Options:
+    ls or list        List all projects/devices
+    new               Create a new project/device
+    rm or remove       Remove a project/device
 "#;
 
 const INVALID_COMMAND: &str = "Invalid command, use 'help' to display available commands";
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 const DEFAULT_CONFIG: &str = "";
-const NEW_DEVICE_INIT: &str = "Create a new device";
 
 #[cfg_attr(test, automock)]
 trait UserInterface {
@@ -52,7 +56,7 @@ impl UserInterface for Console {
 
 struct CommandRunner<T: UserInterface, U: DeviceOperations> {
     console: T,
-    operations: U,
+    device_operations: U,
 }
 
 impl<T: UserInterface, U: DeviceOperations> CommandRunner<T, U> {
@@ -120,32 +124,23 @@ impl<T: UserInterface, U: DeviceOperations> CommandRunner<T, U> {
             return;
         }
 
-        match args[2].as_str() {
+        let result = match args[2].as_str() {
             "ls" | "list" => self.display_device_list(),
-            "new" => self
-                .find_device_factory_create_new_device(args)
-                .map_err(|e| self.display_message(e.as_str()))
-                .unwrap(),
+            "new" => self.find_device_factory_create_new_device(args),
             "rm" | "remove" => self.remove_device(args),
-            _ => {
-                self.display_invalid_command();
-            }
-        }
+            _ => Ok(self.display_invalid_command()),
+        };
+
+        result.unwrap_or_else(|e| self.display_message(&e));
     }
 
-    fn display_device_list(&mut self) {
+    fn display_device_list(&mut self) -> Result<(), String> {
         self.display_message("Device list:");
-        let devices = self.operations.list();
-        match devices {
-            Ok(devices) => {
-                for device in devices {
-                    self.display_message(&format!("Device: {}", device.get_name()));
-                }
-            }
-            Err(e) => {
-                self.display_message(&e);
-            }
+        let devices = self.device_operations.list().map_err(|e| e.to_string())?;
+        for device in devices {
+            self.display_message(&format!("Device: {}", device.get_name()));
         }
+        Ok(())
     }
 
     fn find_device_factory_create_new_device(&mut self, args: Vec<String>) -> Result<(), String> {
@@ -154,24 +149,18 @@ impl<T: UserInterface, U: DeviceOperations> CommandRunner<T, U> {
             return Ok(());
         }
         let device_key = args[3].as_str();
-        match self
-            .operations
+        self.device_operations
             .get_available_device_factories()
             .iter()
             .find(|&key| key.key == device_key)
-        {
-            Some(key) => self.create_new_device(key),
-            None => {
-                self.display_message("No such device configuration exists");
-                return Ok(());
-            }
-        }
+            .map(|key| self.create_new_device(key))
+            .unwrap_or_else(|| Err("Device factory not found".to_string()))
     }
 
     fn create_new_device(&mut self, key: &DeviceFactoryKey) -> Result<(), String> {
         self.display_message("Creating new device of type:");
         let mut device_factory = self
-            .operations
+            .device_operations
             .get_device_factory(key.key.clone())
             .ok_or("No such device configuration exists")?;
         while device_factory.has_next() {
@@ -179,33 +168,33 @@ impl<T: UserInterface, U: DeviceOperations> CommandRunner<T, U> {
             let question_statement = device_factory.get_question_statement();
             let answer = self.ask_question(&question_type, &question_statement);
             if let Some(device_factory) = Rc::get_mut(&mut device_factory) {
-                device_factory.set_question_answer(answer);
+                device_factory
+                    .set_question_answer(answer)
+                    .map_err(|_| "Failed to set answer")?;
             }
         }
         let device = device_factory
             .build()
             .map_err(|_| "Failed to build device")?;
-        self.operations
+        self.device_operations
             .add_device(device)
             .map_err(|_| "Failed to add device")?;
         self.display_message("Device created successfully");
         Ok(())
     }
 
-    fn remove_device(&mut self, args: Vec<String>) {
+    fn remove_device(&mut self, args: Vec<String>) -> Result<(), String> {
         if args.len() < 4 {
-            self.display_invalid_command();
-            return;
+            return Ok(self.display_invalid_command());
         }
         let device_name = args[3].as_str();
-        match self.operations.remove_by_name(device_name.to_string()) {
-            Ok(_) => {
-                self.display_message("Removed device successfully");
-            }
-            Err(e) => {
-                self.display_message(&e);
-            }
-        }
+        self.device_operations
+            .remove_by_name(device_name.to_string())
+            .map_err(|e| e.to_string())
+            .unwrap();
+
+        self.display_message("Removed device successfully");
+        Ok(())
     }
 }
 
@@ -216,16 +205,16 @@ pub fn run(args: Vec<String>) {
         &StandardFileSystem {},
         DEFAULT_CONFIG,
     );
-    let mut operations = Operations::new(Box::new(local_file_storage));
+    let mut device_operations = Operations::new(Box::new(local_file_storage));
     let device_factory = Rc::new(MountedFolderFactory::new());
-    operations.register_device_factory(
+    device_operations.register_device_factory(
         "mounted_folder".to_string(),
         "Mouted device".to_string(),
         device_factory,
     );
     let mut command_runner = CommandRunner {
         console: Console,
-        operations,
+        device_operations,
     };
     command_runner.run(args);
 }
@@ -246,10 +235,10 @@ mod tests {
             .times(1)
             .with(eq(message.clone()))
             .return_const(Ok(()));
-        let operations = MockDeviceOperations::new();
+        let device_operations = MockDeviceOperations::new();
         let command_runner = CommandRunner {
             console,
-            operations,
+            device_operations,
         };
         command_runner.display_message(&message);
     }
@@ -261,10 +250,10 @@ mod tests {
             .expect_read()
             .times(1)
             .returning(|| Ok("Hello, world!".to_string()));
-        let operations = MockDeviceOperations::new();
+        let device_operations = MockDeviceOperations::new();
         let command_runner = CommandRunner {
             console,
-            operations,
+            device_operations,
         };
         let message = command_runner.read_string().unwrap();
         assert_eq!(message, "Hello, world!");
@@ -277,10 +266,10 @@ mod tests {
             .expect_read()
             .times(1)
             .returning(|| Ok("42".to_string()));
-        let operations = MockDeviceOperations::new();
+        let device_operations = MockDeviceOperations::new();
         let command_runner = CommandRunner {
             console,
-            operations,
+            device_operations,
         };
         let message = command_runner.read_number().unwrap();
         assert_eq!(message, 42);
@@ -293,10 +282,10 @@ mod tests {
             .expect_read()
             .times(1)
             .returning(|| Ok("42a".to_string()));
-        let operations = MockDeviceOperations::new();
+        let device_operations = MockDeviceOperations::new();
         let command_runner = CommandRunner {
             console,
-            operations,
+            device_operations,
         };
         let message = command_runner.read_number();
         assert!(message.is_err());
@@ -310,10 +299,10 @@ mod tests {
             .times(1)
             .with(eq(HELP.to_string()))
             .return_const(Ok(()));
-        let operations = MockDeviceOperations::new();
+        let device_operations = MockDeviceOperations::new();
         let command_runner = CommandRunner {
             console,
-            operations,
+            device_operations,
         };
         command_runner.display_help();
     }
@@ -326,10 +315,10 @@ mod tests {
             .times(1)
             .with(eq(HELP.to_string()))
             .return_const(Ok(()));
-        let operations = MockDeviceOperations::new();
+        let device_operations = MockDeviceOperations::new();
         let mut command_runner = CommandRunner {
             console,
-            operations,
+            device_operations,
         };
         command_runner.run(vec!["/path/to/executable".to_string(), "help".to_string()]);
     }
@@ -342,10 +331,10 @@ mod tests {
             .times(1)
             .with(eq(INVALID_COMMAND.to_string()))
             .return_const(Ok(()));
-        let operations = MockDeviceOperations::new();
+        let device_operations = MockDeviceOperations::new();
         let mut command_runner = CommandRunner {
             console,
-            operations,
+            device_operations,
         };
         command_runner.run(vec![
             "/path/to/executable".to_string(),
@@ -361,10 +350,10 @@ mod tests {
             .times(1)
             .with(eq(INVALID_COMMAND.to_string()))
             .return_const(Ok(()));
-        let operations = MockDeviceOperations::new();
+        let device_operations = MockDeviceOperations::new();
         let mut command_runner = CommandRunner {
             console,
-            operations,
+            device_operations,
         };
         command_runner.run(vec!["/path/to/executable".to_string()]);
     }
@@ -377,10 +366,10 @@ mod tests {
             .times(1)
             .with(eq(VERSION.to_string()))
             .return_const(Ok(()));
-        let operations = MockDeviceOperations::new();
+        let device_operations = MockDeviceOperations::new();
         let mut command_runner = CommandRunner {
             console,
-            operations,
+            device_operations,
         };
         command_runner.run(vec![
             "/path/to/executable".to_string(),
@@ -396,10 +385,10 @@ mod tests {
             .times(1)
             .with(eq(VERSION.to_string()))
             .return_const(Ok(()));
-        let operations = MockDeviceOperations::new();
+        let device_operations = MockDeviceOperations::new();
         let mut command_runner = CommandRunner {
             console,
-            operations,
+            device_operations,
         };
         command_runner.run(vec!["/path/to/executable".to_string(), "-v".to_string()]);
     }
@@ -426,7 +415,7 @@ mod tests {
 
         let mut command_runner = CommandRunner {
             console,
-            operations: device_operations,
+            device_operations,
         };
         command_runner.run(vec![
             "/path/to/executable".to_string(),
@@ -443,10 +432,10 @@ mod tests {
             .times(1)
             .with(eq(INVALID_COMMAND.to_string()))
             .return_const(Ok(()));
-        let operations = MockDeviceOperations::new();
+        let device_operations = MockDeviceOperations::new();
         let mut command_runner = CommandRunner {
             console,
-            operations,
+            device_operations,
         };
         command_runner.run(vec![
             "/path/to/executable".to_string(),
@@ -464,7 +453,6 @@ mod tests {
             .times(3)
             .withf(move |msg| {
                 msg.contains(&question)
-                    || msg.contains(NEW_DEVICE_INIT)
                     || msg.contains("Creating new device of type:")
                     || msg.contains("Device created successfully")
             })
@@ -474,8 +462,8 @@ mod tests {
             .times(1)
             .returning(|| Ok(friendly_name.to_string()));
 
-        let mut operations = MockDeviceOperations::new();
-        operations
+        let mut device_operations = MockDeviceOperations::new();
+        device_operations
             .expect_get_available_device_factories()
             .times(1)
             .returning(|| {
@@ -484,7 +472,7 @@ mod tests {
                     readable_name: "Mounted folder".to_string(),
                 }]
             });
-        operations
+        device_operations
             .expect_get_device_factory()
             .times(1)
             .with(eq("mounted_folder".to_string()))
@@ -514,11 +502,14 @@ mod tests {
                     .returning(|| Ok(Box::new(MockDevice::new())));
                 Some(Rc::new(device_factory))
             });
-        operations.expect_add_device().times(1).return_const(Ok(()));
+        device_operations
+            .expect_add_device()
+            .times(1)
+            .return_const(Ok(()));
 
         let mut command_runner = CommandRunner {
             console,
-            operations,
+            device_operations,
         };
 
         command_runner.run(vec![
@@ -546,13 +537,33 @@ mod tests {
 
         let mut command_runner = CommandRunner {
             console,
-            operations: device_operations,
+            device_operations,
         };
         command_runner.run(vec![
             "/path/to/executable".to_string(),
             "device".to_string(),
             "remove".to_string(),
             "USBkey".to_string(),
+        ]);
+    }
+
+    #[test]
+    fn display_invalid_command_when_running_with_device_command_and_invalid_subcommand() {
+        let mut console = MockUserInterface::new();
+        console
+            .expect_write()
+            .times(1)
+            .with(eq(INVALID_COMMAND.to_string()))
+            .return_const(Ok(()));
+        let device_operations = MockDeviceOperations::new();
+        let mut command_runner = CommandRunner {
+            console,
+            device_operations,
+        };
+        command_runner.run(vec![
+            "/path/to/executable".to_string(),
+            "device".to_string(),
+            "invalid".to_string(),
         ]);
     }
 }
