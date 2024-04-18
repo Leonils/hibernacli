@@ -64,7 +64,7 @@ impl<'a, T: UserInterface, U: DeviceOperations, V: ProjectOperations> CommandRun
         }
     }
 
-    pub fn run(&mut self, args: Vec<String>) {
+    pub fn run(&self, args: Vec<String>) {
         if args.len() < 2 {
             self.display_invalid_command();
             return;
@@ -132,7 +132,7 @@ impl<'a, T: UserInterface, U: DeviceOperations, V: ProjectOperations> CommandRun
         self.display_message(INVALID_COMMAND);
     }
 
-    fn run_device_command(&mut self, args: Vec<String>) {
+    fn run_device_command(&self, args: Vec<String>) {
         if args.len() < 3 {
             self.display_invalid_command();
             return;
@@ -148,7 +148,7 @@ impl<'a, T: UserInterface, U: DeviceOperations, V: ProjectOperations> CommandRun
         result.unwrap_or_else(|e| self.display_message(&e));
     }
 
-    fn display_device_list(&mut self) -> Result<(), String> {
+    fn display_device_list(&self) -> Result<(), String> {
         self.display_message("Device list:");
         let devices = self.device_operations.list().map_err(|e| e.to_string())?;
         for device in devices {
@@ -157,7 +157,7 @@ impl<'a, T: UserInterface, U: DeviceOperations, V: ProjectOperations> CommandRun
         Ok(())
     }
 
-    fn find_device_factory_create_new_device(&mut self, args: Vec<String>) -> Result<(), String> {
+    fn find_device_factory_create_new_device(&self, args: Vec<String>) -> Result<(), String> {
         if args.len() < 4 {
             self.display_invalid_command();
             return Ok(());
@@ -171,7 +171,7 @@ impl<'a, T: UserInterface, U: DeviceOperations, V: ProjectOperations> CommandRun
             .unwrap_or_else(|| Err("Device factory not found".to_string()))
     }
 
-    fn create_new_device(&mut self, key: &DeviceFactoryKey) -> Result<(), String> {
+    fn create_new_device(&self, key: &DeviceFactoryKey) -> Result<(), String> {
         self.display_message("Creating new device of type:");
         let mut device_factory = self
             .device_operations
@@ -197,7 +197,7 @@ impl<'a, T: UserInterface, U: DeviceOperations, V: ProjectOperations> CommandRun
         Ok(())
     }
 
-    fn remove_device(&mut self, args: Vec<String>) -> Result<(), String> {
+    fn remove_device(&self, args: Vec<String>) -> Result<(), String> {
         if args.len() < 4 {
             return Ok(self.display_invalid_command());
         }
@@ -211,7 +211,7 @@ impl<'a, T: UserInterface, U: DeviceOperations, V: ProjectOperations> CommandRun
         Ok(())
     }
 
-    fn run_project_command(&mut self, args: Vec<String>) {
+    fn run_project_command(&self, args: Vec<String>) {
         if args.len() < 3 {
             self.display_invalid_command();
             return;
@@ -227,7 +227,7 @@ impl<'a, T: UserInterface, U: DeviceOperations, V: ProjectOperations> CommandRun
         }
     }
 
-    fn display_project_list(&mut self) -> Result<(), String> {
+    fn display_project_list(&self) -> Result<(), String> {
         self.display_message("Project list:");
         let projects = self.project_operations.list_projects()?;
         for project in projects {
