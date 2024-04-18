@@ -94,7 +94,7 @@ impl GlobalConfig {
     }
 
     pub fn get_projects(self) -> Vec<Project> {
-        unimplemented!()
+        self.projects
     }
 
     pub fn get_projects_iter(&self) -> impl Iterator<Item = &Project> {
