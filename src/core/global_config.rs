@@ -6,7 +6,7 @@ use crate::{
     models::{project::Project, secondary_device::Device},
 };
 
-use super::{config::toml::TryRead, device_factories_registry::DeviceFactoryRegistry};
+use super::{config::toml_try_read::TryRead, device_factories_registry::DeviceFactoryRegistry};
 
 pub struct GlobalConfig {
     devices: Vec<Box<dyn Device>>,
