@@ -82,10 +82,10 @@ impl<T: UserInterface, U: DeviceOperations> CommandRunner<T, U> {
 
     fn read_number(&self) -> Result<i32, String> {
         let input = self.console.read()?;
-        match input.trim().parse::<i32>() {
-            Ok(number) => Ok(number),
-            Err(_) => Err("Invalid number".to_string()),
-        }
+        input
+            .trim()
+            .parse::<i32>()
+            .map_err(|_| "Invalid number".to_string())
     }
 
     fn ask_question(&self, question_type: &QuestionType, question_statement: &str) -> String {
@@ -97,10 +97,9 @@ impl<T: UserInterface, U: DeviceOperations> CommandRunner<T, U> {
 
     fn ask_for_string(&self, message: &str) -> String {
         self.display_message(message);
-        match self.read_string() {
-            Ok(answer) => answer,
-            Err(_) => self.ask_for_string(message),
-        }
+        self.read_string()
+            .map_err(|_| self.ask_for_string(message))
+            .unwrap()
     }
 
     fn display_help(&self) {
@@ -123,7 +122,10 @@ impl<T: UserInterface, U: DeviceOperations> CommandRunner<T, U> {
 
         match args[2].as_str() {
             "ls" | "list" => self.display_device_list(),
-            "new" => self.find_device_factory_create_new_device(args),
+            "new" => self
+                .find_device_factory_create_new_device(args)
+                .map_err(|e| self.display_message(e.as_str()))
+                .unwrap(),
             "rm" | "remove" => self.remove_device(args),
             _ => {
                 self.display_invalid_command();
@@ -146,10 +148,10 @@ impl<T: UserInterface, U: DeviceOperations> CommandRunner<T, U> {
         }
     }
 
-    fn find_device_factory_create_new_device(&mut self, args: Vec<String>) {
+    fn find_device_factory_create_new_device(&mut self, args: Vec<String>) -> Result<(), String> {
         if args.len() < 4 {
             self.display_invalid_command();
-            return;
+            return Ok(());
         }
         let device_key = args[3].as_str();
         match self
@@ -159,41 +161,35 @@ impl<T: UserInterface, U: DeviceOperations> CommandRunner<T, U> {
             .find(|&key| key.key == device_key)
         {
             Some(key) => self.create_new_device(key),
-            None => self.display_message("No such device configuration exists"),
+            None => {
+                self.display_message("No such device configuration exists");
+                return Ok(());
+            }
         }
     }
 
-    fn create_new_device(&mut self, key: &DeviceFactoryKey) {
+    fn create_new_device(&mut self, key: &DeviceFactoryKey) -> Result<(), String> {
         self.display_message("Creating new device of type:");
-        match self.operations.get_device_factory(key.key.clone()) {
-            Some(mut device_factory) => {
-                while device_factory.has_next() {
-                    let question_type = device_factory.get_question_type();
-                    let question_statement = device_factory.get_question_statement();
-                    let answer = self.ask_question(&question_type, &question_statement);
-                    if let Some(device_factory) = Rc::get_mut(&mut device_factory) {
-                        device_factory.set_question_answer(answer);
-                    }
-                }
-                let device = device_factory.build();
-                match device {
-                    Ok(device) => match self.operations.add_device(device) {
-                        Ok(_) => {
-                            self.display_message("Device created successfully");
-                        }
-                        Err(e) => {
-                            self.display_message(&e);
-                        }
-                    },
-                    Err(e) => {
-                        self.display_message(&e);
-                    }
-                }
-            }
-            None => {
-                self.display_message("No such device configuration exists");
+        let mut device_factory = self
+            .operations
+            .get_device_factory(key.key.clone())
+            .ok_or("No such device configuration exists")?;
+        while device_factory.has_next() {
+            let question_type = device_factory.get_question_type();
+            let question_statement = device_factory.get_question_statement();
+            let answer = self.ask_question(&question_type, &question_statement);
+            if let Some(device_factory) = Rc::get_mut(&mut device_factory) {
+                device_factory.set_question_answer(answer);
             }
         }
+        let device = device_factory
+            .build()
+            .map_err(|_| "Failed to build device")?;
+        self.operations
+            .add_device(device)
+            .map_err(|_| "Failed to add device")?;
+        self.display_message("Device created successfully");
+        Ok(())
     }
 
     fn remove_device(&mut self, args: Vec<String>) {
