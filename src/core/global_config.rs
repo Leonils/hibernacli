@@ -1,15 +1,9 @@
-use std::str::FromStr;
-
 use itertools::Itertools;
-use toml::{Table, Value};
+use toml::Table;
 
 use crate::{
     adapters::primary_device::GlobalConfigProvider,
-    models::{
-        backup_requirement::{BackupRequirementClass, SecurityLevel},
-        project::{Project, ProjectTrackingStatus},
-        secondary_device::Device,
-    },
+    models::{project::Project, secondary_device::Device},
 };
 
 use super::{config::toml::TryRead, device_factories_registry::DeviceFactoryRegistry};
