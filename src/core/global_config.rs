@@ -108,6 +108,8 @@ impl GlobalConfig {
         Self::assert_no_duplicate_device(&devices)?;
 
         Self::assert_no_errors_in_projects(&project_errors)?;
+        Self::assert_no_duplicate_project_name(&projects)?;
+        Self::assert_no_duplicate_project_path(&projects)?;
 
         Ok(GlobalConfig { devices, projects })
     }
@@ -210,6 +212,58 @@ impl GlobalConfig {
         if !errors.is_empty() {
             return Err(errors.join(", "));
         }
+        Ok(())
+    }
+
+    fn assert_no_duplicate_project_name(projects: &Vec<Project>) -> Result<(), String> {
+        let project_count_by_name = projects
+            .iter()
+            .map(|project| project.get_name())
+            .fold(std::collections::HashMap::new(), |mut acc, name| {
+                *acc.entry(name).or_insert(0) += 1;
+                acc
+            })
+            .into_iter()
+            .filter(|(_, count)| *count > 1)
+            .sorted_by(|(name1, _), (name2, _)| name1.cmp(name2))
+            .collect::<Vec<_>>();
+
+        if !project_count_by_name.is_empty() {
+            return Err(format!(
+                "Duplicated name found in configuration file for project : {}",
+                project_count_by_name
+                    .iter()
+                    .map(|(name, _)| name)
+                    .join(", ")
+            ));
+        }
+
+        Ok(())
+    }
+
+    fn assert_no_duplicate_project_path(projects: &Vec<Project>) -> Result<(), String> {
+        let project_count_by_path = projects
+            .iter()
+            .map(|project| project.get_location())
+            .fold(std::collections::HashMap::new(), |mut acc, path| {
+                *acc.entry(path).or_insert(0) += 1;
+                acc
+            })
+            .into_iter()
+            .filter(|(_, count)| *count > 1)
+            .sorted_by(|(path1, _), (path2, _)| path1.cmp(path2))
+            .collect::<Vec<_>>();
+
+        if !project_count_by_path.is_empty() {
+            return Err(format!(
+                "Duplicated path found in configuration file for project at : {}",
+                project_count_by_path
+                    .iter()
+                    .map(|(path, _)| path)
+                    .join(", ")
+            ));
+        }
+
         Ok(())
     }
 }
@@ -593,6 +647,50 @@ mod tests {
         assert_eq!(
             config.err().unwrap(),
             "Duplicate device found in configuration file: MyPersonalDevice"
+        );
+    }
+
+    #[test]
+    fn when_loading_if_there_is_two_projects_with_same_name_there_should_be_an_error() {
+        let device_factories_registry = get_mock_device_factory_registry();
+        let config_provider = MockGlobalConfigProviderFactory::new(
+            r#"
+    [[projects]]
+    name = "MyProject"
+    path = "/firstPath"
+
+    [[projects]]
+    name = "MyProject"
+    path = "/secondPath"
+    "#,
+        );
+        let config = GlobalConfig::load(&config_provider, &device_factories_registry);
+        assert!(config.is_err());
+        assert_eq!(
+            config.err().unwrap(),
+            "Duplicated name found in configuration file for project : MyProject"
+        );
+    }
+
+    #[test]
+    fn when_loading_if_there_is_two_projects_with_same_path_there_should_be_an_error() {
+        let device_factories_registry = get_mock_device_factory_registry();
+        let config_provider = MockGlobalConfigProviderFactory::new(
+            r#"
+    [[projects]]
+    name = "MyProjectInOnePath"
+    path = "/path"
+
+    [[projects]]
+    name = "MyProjectInAnotherPath"
+    path = "/path"
+    "#,
+        );
+        let config = GlobalConfig::load(&config_provider, &device_factories_registry);
+        assert!(config.is_err());
+        assert_eq!(
+            config.err().unwrap(),
+            "Duplicated path found in configuration file for project at : /path"
         );
     }
 
