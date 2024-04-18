@@ -1,4 +1,9 @@
 pub mod device {
+    use std::rc::Rc;
+
+    #[cfg(test)]
+    use mockall::automock;
+
     use crate::models::secondary_device::{Device, DeviceFactory, DeviceFactoryKey};
 
     /// Manage devices where backups are stored
@@ -12,6 +17,7 @@ pub mod device {
     /// It is then saved to a configuration file. From which
     /// the list of devices is loaded at the start of the application
     ///
+    #[cfg_attr(test, automock)]
     pub trait DeviceOperations {
         /// Get the list of available device factories
         /// Each one is identified by a key, and has a readable name
@@ -20,7 +26,7 @@ pub mod device {
         /// Get a device factory by its key
         /// The key is the one returned by get_available_device_factories
         /// It might panic if the key does not exist
-        fn get_device_factory(&self, device_type: String) -> Option<&Box<dyn DeviceFactory>>;
+        fn get_device_factory(&self, device_type: String) -> Option<Rc<dyn DeviceFactory>>;
 
         /// Add a device to the list of devices
         /// The device is built by the factory returned by get_device_factory

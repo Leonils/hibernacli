@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use crate::{
     adapters::{operations::device::DeviceOperations, primary_device::GlobalConfigProvider},
     models::secondary_device::{Device, DeviceFactory, DeviceFactoryKey},
@@ -5,23 +7,23 @@ use crate::{
 
 use super::{device_factories_registry::DeviceFactoryRegistry, global_config::GlobalConfig};
 
-struct Operations {
+pub struct Operations {
     device_factory_registry: DeviceFactoryRegistry,
     global_config_provider: Box<dyn GlobalConfigProvider>,
 }
 impl Operations {
-    fn new(global_config_provider: Box<dyn GlobalConfigProvider>) -> Self {
+    pub fn new(global_config_provider: Box<dyn GlobalConfigProvider>) -> Self {
         Operations {
             device_factory_registry: DeviceFactoryRegistry::new(),
             global_config_provider,
         }
     }
 
-    fn register_device_factory(
+    pub fn register_device_factory(
         &mut self,
         device_factory_key: String,
         device_factory_readable_name: String,
-        device_factory: Box<dyn DeviceFactory>,
+        device_factory: Rc<dyn DeviceFactory>,
     ) {
         self.device_factory_registry.register_device(
             device_factory_key,
@@ -36,7 +38,7 @@ impl DeviceOperations for Operations {
         self.device_factory_registry.list_factories()
     }
 
-    fn get_device_factory(&self, device_type: String) -> Option<&Box<dyn DeviceFactory>> {
+    fn get_device_factory(&self, device_type: String) -> Option<Rc<dyn DeviceFactory>> {
         self.device_factory_registry
             .get_device_factory(&device_type)
     }
@@ -108,7 +110,7 @@ mod test {
         operations.register_device_factory(
             "MockDevice".to_string(),
             "Mock Device".to_string(),
-            Box::new(MockDeviceFactory),
+            Rc::new(MockDeviceFactory),
         );
 
         let available_factories = operations.get_available_device_factories();
@@ -130,7 +132,7 @@ mod test {
         operations.register_device_factory(
             "MockDevice".to_string(),
             "Mock Device".to_string(),
-            Box::new(MockDeviceFactory),
+            Rc::new(MockDeviceFactory),
         );
 
         let device_factory = operations.get_device_factory("MockDevice".to_string());
@@ -147,7 +149,7 @@ mod test {
         operations.register_device_factory(
             "MockDevice".to_string(),
             "Mock Device".to_string(),
-            Box::new(MockDeviceFactory),
+            Rc::new(MockDeviceFactory),
         );
 
         let device_factory = operations.get_device_factory("NotAdded".to_string());
@@ -171,7 +173,7 @@ mod test {
         registry.register_device(
             "MockDevice".to_string(),
             "Mock Device".to_string(),
-            Box::new(MockDeviceFactory),
+            Rc::new(MockDeviceFactory),
         );
 
         let operations = Operations {
@@ -197,7 +199,7 @@ type = "MockDevice"
         registry.register_device(
             "MockDevice".to_string(),
             "Mock Device".to_string(),
-            Box::new(MockDeviceFactory),
+            Rc::new(MockDeviceFactory),
         );
 
         let mut provider = MockGlobalConfigProvider::new();
@@ -229,7 +231,7 @@ type = "MockDevice"
         registry.register_device(
             "MockDevice".to_string(),
             "Mock Device".to_string(),
-            Box::new(MockDeviceFactory),
+            Rc::new(MockDeviceFactory),
         );
 
         let mut provider = MockGlobalConfigProvider::new();
@@ -269,7 +271,7 @@ type = "MockDevice"
         registry.register_device(
             "MockDevice".to_string(),
             "Mock Device".to_string(),
-            Box::new(MockDeviceFactory),
+            Rc::new(MockDeviceFactory),
         );
 
         let mut provider = MockGlobalConfigProvider::new();

@@ -1,3 +1,6 @@
+#[cfg(test)]
+use mockall::automock;
+
 use std::time::Instant;
 
 use super::{backup_requirement::SecurityLevel, question::QuestionType};
@@ -8,6 +11,7 @@ pub struct DeviceFactoryKey {
     pub readable_name: String,
 }
 
+#[cfg_attr(test, automock)]
 pub trait Device {
     // The name of the device
     fn get_name(&self) -> String;
@@ -31,6 +35,7 @@ pub trait Device {
     fn to_toml_table(&self) -> toml::value::Table;
 }
 
+#[cfg_attr(test, automock)]
 pub trait DeviceFactory {
     fn get_question_statement(&self) -> &str;
     fn get_question_type(&self) -> &QuestionType;
