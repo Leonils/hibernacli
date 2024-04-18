@@ -77,7 +77,14 @@ impl GlobalConfig {
     }
 
     pub fn remove_project(&mut self, name: &str) -> Result<(), String> {
-        unimplemented!()
+        let index = self
+            .projects
+            .iter()
+            .position(|p| p.get_name() == name)
+            .ok_or_else(|| "Project not found".to_string())?;
+
+        self.projects.remove(index);
+        Ok(())
     }
 
     pub fn get_projects(self) -> Vec<Project> {
@@ -1201,5 +1208,36 @@ type = "MockDeviceWithParameters"
             result.err().unwrap(),
             "Project with path /tmp already exists"
         );
+    }
+
+    #[test]
+    fn when_deleting_project_it_shall_be_removed() {
+        let mut global_config = GlobalConfig {
+            devices: vec![],
+            projects: vec![],
+        };
+
+        let project = Project::new("MyProject".to_string(), "/tmp".to_string(), None);
+        let project2 = Project::new("MySecondProject".to_string(), "/root".to_string(), None);
+
+        global_config.add_project(project).unwrap();
+        global_config.add_project(project2).unwrap();
+        assert_eq!(global_config.projects.len(), 2);
+
+        global_config.remove_project("MyProject").unwrap();
+        assert_eq!(global_config.projects.len(), 1);
+        assert_eq!(global_config.projects[0].get_name(), "MySecondProject");
+    }
+
+    #[test]
+    fn when_deleting_not_registered_project_it_shoud_throw_an_error() {
+        let mut global_config = GlobalConfig {
+            devices: vec![],
+            projects: vec![],
+        };
+
+        let result = global_config.remove_project("MyProject");
+        assert!(result.is_err());
+        assert_eq!(result.err().unwrap(), "Project not found");
     }
 }
