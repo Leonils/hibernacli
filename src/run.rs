@@ -21,9 +21,9 @@ pub fn run(args: Vec<String>) {
     let device_factory = Rc::new(MountedFolderFactory::new());
     operations.register_device_factory(
         "mounted_folder".to_string(),
-        "Mouted device".to_string(),
+        "Mounted device".to_string(),
         device_factory,
     );
-    let mut command_runner = CommandRunner::new(Console, &operations, &operations);
+    let command_runner = CommandRunner::new(Console, &operations, &operations);
     command_runner.run(args);
 }

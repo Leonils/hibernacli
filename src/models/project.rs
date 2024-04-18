@@ -11,8 +11,8 @@ pub struct Project {
     // The exact API might be found later
     location: String,
 
-    // What is this project tracking status? might be explicitely
-    // ignored, implicitly uncategorized, or tracked and ready to be
+    // What is this project tracking status? might be explicitly
+    // ignored, implicitly un-categorized, or tracked and ready to be
     // backed up.
     tracking_status: ProjectTrackingStatus,
 }

@@ -62,7 +62,7 @@ impl<'a> GlobalConfigProvider for LocalFileStorage<'a> {
     }
 }
 
-trait PathProvider {
+pub trait PathProvider {
     fn get_config_dir(&self, project_name: &str) -> Option<Box<Path>>;
 }
 
