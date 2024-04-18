@@ -7,6 +7,7 @@ mod core {
 
     mod config {
         pub mod from_toml;
+        pub mod to_toml;
         pub mod toml_try_read;
     }
 

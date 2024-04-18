@@ -212,6 +212,13 @@ impl GlobalConfig {
 }
 
 #[cfg(test)]
+impl GlobalConfig {
+    pub fn new(devices: Vec<Box<dyn Device>>, projects: Vec<Project>) -> Self {
+        Self { devices, projects }
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use std::rc::Rc;
 
