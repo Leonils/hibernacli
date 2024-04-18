@@ -44,6 +44,8 @@ pub mod device {
 
 pub mod project {
     use crate::models::project::Project;
+    #[cfg(test)]
+    use mockall::automock;
 
     pub struct AddProjectArgs {
         pub name: String,
@@ -57,6 +59,7 @@ pub mod project {
     /// And only a reference to the project is saved in the global configuration
     /// So that the project can be moved around without losing its configuration
     ///
+    #[cfg_attr(test, automock)]
     pub trait ProjectOperations {
         /// Add a project to the list of projects
         /// The project is identified by its name, mut AddProjectArgs
