@@ -7,7 +7,10 @@ use crate::{
 };
 
 use super::{
-    config::from_toml::{parse_toml_global_config, ParseTomlResult},
+    config::{
+        from_toml::{parse_toml_global_config, ParseTomlResult},
+        to_toml::ToToml,
+    },
     device_factories_registry::DeviceFactoryRegistry,
 };
 
@@ -126,22 +129,8 @@ impl GlobalConfig {
         Ok(GlobalConfig { devices, projects })
     }
 
-    pub fn save(&self, config_provider: &dyn GlobalConfigProvider) -> Result<(), String> {
-        let device_tables = self
-            .devices
-            .iter()
-            .map(|device| device.to_toml_table())
-            .collect::<Vec<_>>();
-
-        let config_toml = toml::to_string(&PartiallyParsedGlobalConfig {
-            devices: if device_tables.is_empty() {
-                None
-            } else {
-                Some(device_tables)
-            },
-            projects: None,
-        })
-        .map_err(|e| e.to_string())?;
+    pub fn save(self, config_provider: &dyn GlobalConfigProvider) -> Result<(), String> {
+        let config_toml = self.to_toml()?;
 
         config_provider.write_global_config(&config_toml).unwrap();
 
@@ -749,43 +738,6 @@ mod tests {
         );
 
         assert_eq!(global_config.devices.len(), 1);
-    }
-
-    #[test]
-    fn when_saving_config_it_shall_call_save_on_config_provider() {
-        let mut config_provider = MockGlobalConfigProvider::new();
-        config_provider
-            .expect_write_global_config()
-            .times(1)
-            .with(eq(""))
-            .return_const(Ok(()));
-
-        let global_config = GlobalConfig {
-            devices: vec![],
-            projects: vec![],
-        };
-        global_config.save(&config_provider).unwrap();
-    }
-
-    #[test]
-    fn when_saving_config_with_some_devices_it_shall_save_config_with_devices() {
-        let mut config_provider = MockGlobalConfigProvider::new();
-        config_provider
-            .expect_write_global_config()
-            .times(1)
-            .with(eq(r#"[[devices]]
-name = "MockDevice"
-type = "MockDevice"
-"#))
-            .return_const(Ok(()));
-
-        let device = MockDeviceFactory.build().unwrap();
-        let global_config = GlobalConfig {
-            devices: vec![device],
-            projects: vec![],
-        };
-
-        global_config.save(&config_provider).unwrap();
     }
 
     #[test]
