@@ -44,6 +44,7 @@ pub mod device {
 
 pub mod project {
     use crate::models::project::Project;
+
     #[cfg(test)]
     use mockall::automock;
 
