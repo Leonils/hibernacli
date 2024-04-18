@@ -18,15 +18,15 @@ pub struct Project {
 }
 
 impl Project {
-    pub fn new(name: String, location: String) -> Project {
+    pub fn new(
+        name: String,
+        location: String,
+        tracking_status: Option<ProjectTrackingStatus>,
+    ) -> Project {
         Project {
             name,
             location,
-            tracking_status: ProjectTrackingStatus::TrackedProject {
-                backup_requirement_class: BackupRequirementClass::default(),
-                last_update: Some(Instant::now()),
-                current_copies: Vec::new(),
-            },
+            tracking_status: tracking_status.unwrap_or(ProjectTrackingStatus::default()),
         }
     }
 
@@ -57,10 +57,35 @@ pub enum ProjectTrackingStatus {
     IgnoredProject,
 }
 
+impl ProjectTrackingStatus {
+    pub fn default() -> ProjectTrackingStatus {
+        ProjectTrackingStatus::TrackedProject {
+            backup_requirement_class: BackupRequirementClass::default(),
+            last_update: Some(Instant::now()),
+            current_copies: Vec::new(),
+        }
+    }
+
+    pub fn get_backup_requirement_class(&self) -> Option<&BackupRequirementClass> {
+        match self {
+            ProjectTrackingStatus::TrackedProject {
+                backup_requirement_class,
+                ..
+            } => Some(backup_requirement_class),
+            _ => None,
+        }
+    }
+}
+
 pub struct ProjectCopy {
     // What is the last time a backup was made
     last_backup: Option<Instant>,
 
     // What is the device on which it was done?
     secondary_device: dyn Device,
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
 }
