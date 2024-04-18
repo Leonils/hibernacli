@@ -273,11 +273,8 @@ impl GlobalConfig {
         match tracking_status_table.get("type") {
             Some(Value::String(status_str)) => match status_str.as_str() {
                 "TrackedProject" => {
-                    let backup_requirement_class_table: Table =
-                        tracking_status_table.try_read("backup_requirement_class")?;
-
                     let backup_requirement_class =
-                        Self::decode_backup_requirement_class(&backup_requirement_class_table)?;
+                        tracking_status_table.try_read("backup_requirement_class")?;
 
                     Ok(ProjectTrackingStatus::TrackedProject {
                         backup_requirement_class,
@@ -291,21 +288,6 @@ impl GlobalConfig {
             },
             _ => Err("Missing tracking status type".to_string()),
         }
-    }
-
-    fn decode_backup_requirement_class(table: &Table) -> Result<BackupRequirementClass, String> {
-        let target_copies: u32 = table.try_read("target_copies")?;
-        let target_locations: u32 = table.try_read("target_locations")?;
-        let min_security_level_str: &str = table.try_read("min_security_level")?;
-        let min_security_level = SecurityLevel::from_str(min_security_level_str)?;
-        let name: &str = table.try_read("name")?;
-
-        Ok(BackupRequirementClass::new(
-            target_copies,
-            target_locations,
-            min_security_level,
-            name.to_string(),
-        ))
     }
 }
 
