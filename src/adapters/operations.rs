@@ -44,11 +44,13 @@ pub mod device {
 
 pub mod project {
     use crate::models::project::Project;
+
     #[cfg(test)]
     use mockall::automock;
 
     pub struct AddProjectArgs {
         pub name: String,
+        pub location: String,
     }
 
     /// Projects are a set of files that are a single unit for the user
@@ -63,13 +65,12 @@ pub mod project {
         /// Add a project to the list of projects
         /// The project is identified by its name, mut AddProjectArgs
         /// could be extended in the future to include more information
-        fn add(&self, args: AddProjectArgs) -> Project;
-
+        fn add_project(&self, args: AddProjectArgs) -> Result<(), String>;
         /// A project shall be uniquely identified by its name
         /// So the name is enough to remove a project
-        fn remove_by_name(&self, name: String);
+        fn remove_project_by_name(&self, name: String) -> Result<(), String>;
 
         /// List all projects with their status
-        fn list(&self) -> Vec<Project>;
+        fn list_projects(&self) -> Result<Vec<Project>, String>;
     }
 }

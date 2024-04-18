@@ -1,4 +1,4 @@
-use hibernacli::cli::run;
+use hibernacli::run::run;
 use std::env;
 
 fn main() {

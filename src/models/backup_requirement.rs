@@ -1,3 +1,11 @@
+use std::{
+    fmt::{Display, Formatter},
+    str::FromStr,
+};
+
+use serde::Serialize;
+
+#[derive(Serialize)]
 pub enum SecurityLevel {
     // Connected to network, no authorization required
     NetworkPublic,       // referenced, accessible to anyone
@@ -15,6 +23,38 @@ pub enum SecurityLevel {
     LocalMaxSecurity, // local location with maximum security (in a safe?)
 }
 
+impl FromStr for SecurityLevel {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "NetworkPublic" => Ok(SecurityLevel::NetworkPublic),
+            "NetworkUnreferenced" => Ok(SecurityLevel::NetworkUnreferenced),
+            "NetworkUntrustedRestricted" => Ok(SecurityLevel::NetworkUntrustedRestricted),
+            "NetworkTrustedRestricted" => Ok(SecurityLevel::NetworkTrustedRestricted),
+            "NetworkLocal" => Ok(SecurityLevel::NetworkLocal),
+            "Local" => Ok(SecurityLevel::Local),
+            "LocalMaxSecurity" => Ok(SecurityLevel::LocalMaxSecurity),
+            _ => Err(format!("Invalid SecurityLevel: {}", s)),
+        }
+    }
+}
+
+impl Display for SecurityLevel {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SecurityLevel::NetworkPublic => write!(f, "NetworkPublic"),
+            SecurityLevel::NetworkUnreferenced => write!(f, "NetworkUnreferenced"),
+            SecurityLevel::NetworkUntrustedRestricted => write!(f, "NetworkUntrustedRestricted"),
+            SecurityLevel::NetworkTrustedRestricted => write!(f, "NetworkTrustedRestricted"),
+            SecurityLevel::NetworkLocal => write!(f, "NetworkLocal"),
+            SecurityLevel::Local => write!(f, "Local"),
+            SecurityLevel::LocalMaxSecurity => write!(f, "LocalMaxSecurity"),
+        }
+    }
+}
+
+#[derive(Serialize)]
 pub struct BackupRequirementClass {
     // The number of distinct copies we want to keep (including the primary)
     target_copies: u32,
