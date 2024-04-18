@@ -161,12 +161,12 @@ impl GlobalConfig {
 
     fn from_toml_load_tables_of<T>(
         tables: Option<Vec<Table>>,
-        loader: impl Fn(Table) -> Result<T, String>,
+        loader: impl Fn(&Table) -> Result<T, String>,
     ) -> (Vec<String>, Vec<T>) {
         tables
             .unwrap_or(vec![])
             .into_iter()
-            .map(loader)
+            .map(|table| loader(&table))
             .into_iter()
             .partition_map(From::from)
     }
@@ -176,17 +176,7 @@ impl GlobalConfig {
         device_factories_registry: &DeviceFactoryRegistry,
     ) -> Result<Box<dyn Device>, String> {
         let name: &str = device_table.try_read("name")?;
-        let name = device_table
-            .get("name")
-            .ok_or_else(|| "Missing name for device".to_string())?
-            .as_str()
-            .ok_or_else(|| "Invalid string for name".to_string())?;
-
-        let device_type: &str = device_table
-            .get("type")
-            .ok_or_else(|| "Type not found".to_string())?
-            .as_str()
-            .ok_or_else(|| "Invalid string for type".to_string())?;
+        let device_type: &str = device_table.try_read("type")?;
 
         let factory = device_factories_registry
             .get_device_factory(device_type)
@@ -196,20 +186,9 @@ impl GlobalConfig {
         Ok(device)
     }
 
-    fn load_project_from_toml_bloc(
-        project_table: toml::map::Map<String, toml::Value>,
-    ) -> Result<Project, String> {
-        let name = project_table
-            .get("name")
-            .ok_or_else(|| "Missing name for project".to_string())?
-            .as_str()
-            .ok_or_else(|| "Invalid string for name".to_string())?;
-
-        let path = project_table
-            .get("path")
-            .ok_or_else(|| "Missing path for project".to_string())?
-            .as_str()
-            .ok_or_else(|| "Invalid string for path".to_string())?;
+    fn load_project_from_toml_bloc(project_table: &Table) -> Result<Project, String> {
+        let name: &str = project_table.try_read("name")?;
+        let path: &str = project_table.try_read("path")?;
 
         let tracking_status_table = project_table
             .get("tracking_status")
@@ -652,7 +631,7 @@ mod tests {
         assert!(config.is_err());
         assert_eq!(
             config.err().unwrap(),
-            "Errors while reading projects from config: Missing name for project"
+            "Errors while reading projects from config: Missing 'name' field"
         );
     }
 
@@ -669,7 +648,7 @@ mod tests {
         assert!(config.is_err());
         assert_eq!(
             config.err().unwrap(),
-            "Errors while reading projects from config: Missing path for project"
+            "Errors while reading projects from config: Missing 'path' field"
         );
     }
 
@@ -710,7 +689,7 @@ mod tests {
         assert!(config.is_err());
         assert_eq!(
             config.err().unwrap(),
-            "Errors while reading projects from config: Missing path for project, Missing name for project"
+            "Errors while reading projects from config: Missing 'path' field, Missing 'name' field"
         );
     }
 
