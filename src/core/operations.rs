@@ -111,8 +111,16 @@ impl ProjectOperations for Operations {
         Ok(())
     }
 
-    fn remove_project_by_name(&self, name: String) {
-        todo!()
+    fn remove_project_by_name(&self, name: String) -> Result<(), String> {
+        let mut config = GlobalConfig::load(
+            self.global_config_provider.as_ref(),
+            &self.device_factory_registry,
+        )?;
+
+        config.remove_project(&name)?;
+        config.save(self.global_config_provider.as_ref())?;
+
+        Ok(())
     }
 
     fn list_projects(&self) -> Result<Vec<Project>, String> {
@@ -499,8 +507,8 @@ type = "UntrackedProject"
             .expect_write_global_config()
             .times(1)
             .with(eq(r#"[[projects]]
-location = "/path/to/project"
 name = "MyProject"
+path = "/path/to/project"
 
 [projects.tracking_status]
 last_update = "0"
@@ -541,8 +549,8 @@ target_locations = 2
         provider
             .expect_read_global_config()
             .return_const(Ok(r#"[[projects]]
-path = "/path/to/project"
 name = "AnotherProject"
+path = "/path/to/project"
 
 [projects.tracking_status]
 type = "IgnoredProject"
@@ -552,15 +560,15 @@ type = "IgnoredProject"
             .expect_write_global_config()
             .times(1)
             .with(eq(r#"[[projects]]
-location = "/path/to/project"
 name = "AnotherProject"
+path = "/path/to/project"
 
 [projects.tracking_status]
 type = "IgnoredProject"
 
 [[projects]]
-location = "/path/to/project2"
 name = "MyProject"
+path = "/path/to/project2"
 
 [projects.tracking_status]
 last_update = "0"
@@ -586,5 +594,109 @@ target_locations = 2
         };
 
         operations.add_project(project).unwrap();
+    }
+
+    #[test]
+    fn when_removing_last_project_by_name_it_shall_update_the_configuration() {
+        let mut registry = DeviceFactoryRegistry::new();
+        registry.register_device(
+            "MockDevice".to_string(),
+            "Mock Device".to_string(),
+            Rc::new(MockDeviceFactory),
+        );
+
+        let mut provider = MockGlobalConfigProvider::new();
+        provider
+            .expect_read_global_config()
+            .return_const(Ok(r#"[[projects]]
+name = "AnotherProject"
+path = "/path/to/project"
+
+[projects.tracking_status]
+type = "IgnoredProject"
+"#
+            .to_string()));
+        provider
+            .expect_write_global_config()
+            .times(1)
+            .with(eq(r#""#.to_string()))
+            .return_const(Ok(()));
+
+        let operations = Operations {
+            device_factory_registry: registry,
+            global_config_provider: Box::new(provider),
+        };
+
+        operations
+            .remove_project_by_name("AnotherProject".to_string())
+            .unwrap();
+    }
+
+    #[test]
+    fn when_removing_project_not_in_config_it_shall_fail() {
+        let operations = Operations {
+            device_factory_registry: DeviceFactoryRegistry::new(),
+            global_config_provider: Box::new(MockGlobalConfigProviderFactory::new(r#""#)),
+        };
+
+        let result = operations.remove_project_by_name("NotInConfig".to_string());
+        assert!(result.err().unwrap().contains("Project not found"));
+    }
+
+    #[test]
+    fn when_removing_project_from_config_with_2_projects_it_shall_only_remove_one() {
+        let mut registry = DeviceFactoryRegistry::new();
+        registry.register_device(
+            "MockDevice".to_string(),
+            "Mock Device".to_string(),
+            Rc::new(MockDeviceFactory),
+        );
+
+        let mut provider = MockGlobalConfigProvider::new();
+        provider
+            .expect_read_global_config()
+            .return_const(Ok(r#"[[projects]]
+name = "AnotherProject"
+path = "/path/to/project"
+
+[projects.tracking_status]
+type = "IgnoredProject"
+
+[[projects]]
+name = "MyProject"
+path = "/path/to/project2"
+
+[projects.tracking_status]
+last_update = "0"
+type = "TrackedProject"
+
+[projects.tracking_status.backup_requirement_class]
+min_security_level = "NetworkUntrustedRestricted"
+name = "Default"
+target_copies = 3
+target_locations = 2
+"#
+            .to_string()));
+        provider
+            .expect_write_global_config()
+            .times(1)
+            .with(eq(r#"[[projects]]
+name = "AnotherProject"
+path = "/path/to/project"
+
+[projects.tracking_status]
+type = "IgnoredProject"
+"#
+            .to_string()))
+            .return_const(Ok(()));
+
+        let operations = Operations {
+            device_factory_registry: registry,
+            global_config_provider: Box::new(provider),
+        };
+
+        operations
+            .remove_project_by_name("MyProject".to_string())
+            .unwrap();
     }
 }

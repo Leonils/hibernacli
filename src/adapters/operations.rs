@@ -64,7 +64,7 @@ pub mod project {
         fn add_project(&self, args: AddProjectArgs) -> Result<(), String>;
         /// A project shall be uniquely identified by its name
         /// So the name is enough to remove a project
-        fn remove_project_by_name(&self, name: String);
+        fn remove_project_by_name(&self, name: String) -> Result<(), String>;
 
         /// List all projects with their status
         fn list_projects(&self) -> Result<Vec<Project>, String>;

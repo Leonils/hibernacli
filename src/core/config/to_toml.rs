@@ -150,7 +150,7 @@ impl ToTomlTable for Project {
             toml::Value::String(self.get_name().clone()),
         );
         table.insert(
-            "location".to_string(),
+            "path".to_string(),
             toml::Value::String(self.get_location().clone()),
         );
         table.insert(
@@ -291,7 +291,7 @@ target_locations = 2
     fn when_converting_project_to_toml_it_shall_return_toml() {
         let project = Project::new(
             "MyProject".to_string(),
-            "MyLocation".to_string(),
+            "path/to/project".to_string(),
             Some(ProjectTrackingStatus::TrackedProject {
                 last_update: Some(SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(100)),
                 backup_requirement_class: BackupRequirementClass::default(),
@@ -302,8 +302,8 @@ target_locations = 2
         let toml = project.to_toml().unwrap();
         assert_eq!(
             toml,
-            r#"location = "MyLocation"
-name = "MyProject"
+            r#"name = "MyProject"
+path = "path/to/project"
 
 [tracking_status]
 last_update = "100"
@@ -322,7 +322,7 @@ target_locations = 2
     fn when_converting_config_with_one_project_to_toml_it_shall_return_toml() {
         let project = Project::new(
             "MyProject".to_string(),
-            "MyLocation".to_string(),
+            "path/to/project".to_string(),
             Some(ProjectTrackingStatus::TrackedProject {
                 last_update: Some(SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(100)),
                 backup_requirement_class: BackupRequirementClass::default(),
@@ -335,8 +335,8 @@ target_locations = 2
         assert_eq!(
             toml,
             r#"[[projects]]
-location = "MyLocation"
 name = "MyProject"
+path = "path/to/project"
 
 [projects.tracking_status]
 last_update = "100"
@@ -355,7 +355,7 @@ target_locations = 2
     fn when_converting_config_with_multiple_projects_to_toml_it_shall_return_toml() {
         let project1 = Project::new(
             "MyProject".to_string(),
-            "MyLocation".to_string(),
+            "path/to/project".to_string(),
             Some(ProjectTrackingStatus::TrackedProject {
                 last_update: Some(SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(100)),
                 backup_requirement_class: BackupRequirementClass::default(),
@@ -365,7 +365,7 @@ target_locations = 2
 
         let project2 = Project::new(
             "MyProject2".to_string(),
-            "MyLocation2".to_string(),
+            "path/to/project2".to_string(),
             Some(ProjectTrackingStatus::UntrackedProject),
         );
 
@@ -374,8 +374,8 @@ target_locations = 2
         assert_eq!(
             toml,
             r#"[[projects]]
-location = "MyLocation"
 name = "MyProject"
+path = "path/to/project"
 
 [projects.tracking_status]
 last_update = "100"
@@ -388,8 +388,8 @@ target_copies = 3
 target_locations = 2
 
 [[projects]]
-location = "MyLocation2"
 name = "MyProject2"
+path = "path/to/project2"
 
 [projects.tracking_status]
 type = "UntrackedProject"
@@ -403,7 +403,7 @@ type = "UntrackedProject"
         let device2 = MockDeviceWithParameters::new("MyDevice", "MyParameter");
         let project1 = Project::new(
             "MyProject".to_string(),
-            "MyLocation".to_string(),
+            "path/to/project".to_string(),
             Some(ProjectTrackingStatus::TrackedProject {
                 last_update: Some(SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(100)),
                 backup_requirement_class: BackupRequirementClass::default(),
@@ -413,7 +413,7 @@ type = "UntrackedProject"
 
         let project2 = Project::new(
             "MyProject2".to_string(),
-            "MyLocation2".to_string(),
+            "path/to/project2".to_string(),
             Some(ProjectTrackingStatus::UntrackedProject),
         );
 
@@ -434,8 +434,8 @@ parameter = "MyParameter"
 type = "MockDeviceWithParameters"
 
 [[projects]]
-location = "MyLocation"
 name = "MyProject"
+path = "path/to/project"
 
 [projects.tracking_status]
 last_update = "100"
@@ -448,8 +448,8 @@ target_copies = 3
 target_locations = 2
 
 [[projects]]
-location = "MyLocation2"
 name = "MyProject2"
+path = "path/to/project2"
 
 [projects.tracking_status]
 type = "UntrackedProject"
