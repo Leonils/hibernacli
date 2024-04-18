@@ -5,6 +5,10 @@ mod core {
         pub mod mocks;
     }
 
+    mod config {
+        pub mod toml;
+    }
+
     mod backup_execution;
     mod backup_exploration;
     mod device_factories_registry;
