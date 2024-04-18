@@ -1,4 +1,4 @@
-use std::time::Instant;
+use std::time::{Instant, SystemTime};
 
 use super::{backup_requirement::BackupRequirementClass, secondary_device::Device};
 
@@ -49,7 +49,7 @@ pub enum ProjectTrackingStatus {
         backup_requirement_class: BackupRequirementClass,
 
         // Update date of the last updated file in the project
-        last_update: Option<Instant>,
+        last_update: Option<SystemTime>,
         // The actual copies of the project on secondary drives
         current_copies: Vec<Box<ProjectCopy>>,
     },
@@ -61,7 +61,7 @@ impl ProjectTrackingStatus {
     pub fn default() -> ProjectTrackingStatus {
         ProjectTrackingStatus::TrackedProject {
             backup_requirement_class: BackupRequirementClass::default(),
-            last_update: Some(Instant::now()),
+            last_update: Some(SystemTime::now()),
             current_copies: Vec::new(),
         }
     }
@@ -76,7 +76,7 @@ impl ProjectTrackingStatus {
         }
     }
 
-    pub fn get_last_update(&self) -> Option<Instant> {
+    pub fn get_last_update(&self) -> Option<SystemTime> {
         match self {
             ProjectTrackingStatus::TrackedProject { last_update, .. } => *last_update,
             _ => None,
@@ -97,9 +97,4 @@ pub struct ProjectCopy {
 
     // What is the device on which it was done?
     secondary_device: dyn Device,
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
 }

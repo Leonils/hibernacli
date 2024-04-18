@@ -1,13 +1,23 @@
+use std::time::UNIX_EPOCH;
+
 use toml::Table;
 
 use crate::{
-    core::global_config::GlobalConfig, models::backup_requirement::BackupRequirementClass,
+    core::global_config::GlobalConfig,
+    models::{
+        backup_requirement::BackupRequirementClass,
+        project::{ProjectCopy, ProjectTrackingStatus},
+    },
 };
 
 #[derive(serde::Deserialize, serde::Serialize, Debug, Default)]
 struct PartiallyParsedGlobalConfig {
     devices: Option<Vec<Table>>,
     projects: Option<Vec<Table>>,
+}
+
+pub trait ToTomlValue {
+    fn to_toml_value(&self) -> Result<toml::Value, String>;
 }
 
 pub trait ToToml {
@@ -35,14 +45,98 @@ impl ToToml for GlobalConfig {
     }
 }
 
+impl ToTomlValue for BackupRequirementClass {
+    fn to_toml_value(&self) -> Result<toml::Value, String> {
+        let mut table = Table::new();
+        table.insert(
+            "target_copies".to_string(),
+            toml::Value::Integer(self.get_target_copies() as i64),
+        );
+        table.insert(
+            "target_locations".to_string(),
+            toml::Value::Integer(self.get_target_locations() as i64),
+        );
+        table.insert(
+            "min_security_level".to_string(),
+            toml::Value::String(self.get_min_security_level().to_string()),
+        );
+        table.insert(
+            "name".to_string(),
+            toml::Value::String(self.get_name().clone()),
+        );
+
+        Ok(toml::Value::Table(table))
+    }
+}
+
 impl ToToml for BackupRequirementClass {
     fn to_toml(&self) -> Result<String, String> {
-        toml::to_string(self).map_err(|e| e.to_string())
+        let toml_value = self.to_toml_value()?;
+        let toml = toml_value.to_string();
+        Ok(toml)
+    }
+}
+
+impl ToTomlValue for ProjectTrackingStatus {
+    fn to_toml_value(&self) -> Result<toml::Value, String> {
+        let type_name = match self {
+            ProjectTrackingStatus::TrackedProject { .. } => "TrackedProject",
+            ProjectTrackingStatus::UntrackedProject => "UntrackedProject",
+            ProjectTrackingStatus::IgnoredProject => "IgnoredProject",
+        };
+
+        let mut table = Table::new();
+        table.insert(
+            "type".to_string(),
+            toml::Value::String(type_name.to_string()),
+        );
+
+        match self {
+            ProjectTrackingStatus::TrackedProject {
+                backup_requirement_class,
+                last_update,
+                ..
+            } => {
+                table.insert(
+                    "backup_requirement_class".to_string(),
+                    backup_requirement_class.to_toml_value()?,
+                );
+                table.insert(
+                    "last_update".to_string(),
+                    toml::Value::String(
+                        last_update
+                            .map(|instant| {
+                                instant
+                                    .duration_since(UNIX_EPOCH)
+                                    .unwrap()
+                                    .as_secs()
+                                    .to_string()
+                            })
+                            .unwrap_or_else(|| "".to_string()),
+                    ),
+                );
+
+                // TODO: Implement ProjectCopy
+            }
+            _ => {}
+        }
+
+        Ok(toml::Value::Table(table))
+    }
+}
+
+impl ToToml for ProjectTrackingStatus {
+    fn to_toml(&self) -> Result<String, String> {
+        let toml_value = self.to_toml_value()?;
+        let toml = toml_value.to_string();
+        Ok(toml)
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::time::SystemTime;
+
     use mockall::predicate::eq;
 
     use crate::adapters::primary_device::MockGlobalConfigProvider;
@@ -102,11 +196,37 @@ type = "MockDeviceWithParameters"
         let toml = backup_requirement_class.to_toml().unwrap();
         assert_eq!(
             toml,
-            r#"target_copies = 3
-target_locations = 2
-min_security_level = "NetworkUntrustedRestricted"
-name = "Default"
-"#
+            r#"{ min_security_level = "NetworkUntrustedRestricted", name = "Default", target_copies = 3, target_locations = 2 }"#
         );
+    }
+
+    #[test]
+    fn when_converting_tracked_project_to_toml_it_shall_return_toml() {
+        let backup_requirement_class = BackupRequirementClass::default();
+        let last_update = Some(SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(100));
+        let project_tracking_status = ProjectTrackingStatus::TrackedProject {
+            backup_requirement_class,
+            last_update,
+            current_copies: vec![],
+        };
+        let toml = project_tracking_status.to_toml().unwrap();
+        assert_eq!(
+            toml,
+            r#"{ last_update = "100", type = "TrackedProject", backup_requirement_class = { min_security_level = "NetworkUntrustedRestricted", name = "Default", target_copies = 3, target_locations = 2 } }"#
+        );
+    }
+
+    #[test]
+    fn when_converting_untracked_project_to_toml_it_shall_return_toml() {
+        let project_tracking_status = ProjectTrackingStatus::UntrackedProject;
+        let toml = project_tracking_status.to_toml().unwrap();
+        assert_eq!(toml, r#"{ type = "UntrackedProject" }"#);
+    }
+
+    #[test]
+    fn when_converting_ignored_project_to_toml_it_shall_return_toml() {
+        let project_tracking_status = ProjectTrackingStatus::IgnoredProject;
+        let toml = project_tracking_status.to_toml().unwrap();
+        assert_eq!(toml, r#"{ type = "IgnoredProject" }"#);
     }
 }
