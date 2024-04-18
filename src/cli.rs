@@ -24,6 +24,7 @@ Options:
 "#;
 
 const INVALID_COMMAND: &str = "Invalid command, use 'help' to display available commands";
+const TODO_COMMAND: &str = "This command is not implemented yet, but it will be soon!";
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[cfg_attr(test, automock)]
@@ -130,6 +131,10 @@ impl<'a, T: UserInterface, U: DeviceOperations, V: ProjectOperations> CommandRun
         self.display_message(INVALID_COMMAND);
     }
 
+    fn display_todo(&self) {
+        self.display_message(TODO_COMMAND);
+    }
+
     fn run_device_command(&self, args: Vec<String>) {
         if args.len() < 3 {
             self.display_invalid_command();
@@ -218,6 +223,7 @@ impl<'a, T: UserInterface, U: DeviceOperations, V: ProjectOperations> CommandRun
             "ls" | "list" => self
                 .display_project_list()
                 .unwrap_or_else(|e| self.display_message(&e)),
+            "new" | "rm" | "remove" => self.display_todo(),
             _ => {
                 self.display_invalid_command();
             }
