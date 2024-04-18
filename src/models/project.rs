@@ -75,6 +75,20 @@ impl ProjectTrackingStatus {
             _ => None,
         }
     }
+
+    pub fn get_last_update(&self) -> Option<Instant> {
+        match self {
+            ProjectTrackingStatus::TrackedProject { last_update, .. } => *last_update,
+            _ => None,
+        }
+    }
+
+    pub fn get_current_copies(&self) -> Option<&Vec<Box<ProjectCopy>>> {
+        match self {
+            ProjectTrackingStatus::TrackedProject { current_copies, .. } => Some(current_copies),
+            _ => None,
+        }
+    }
 }
 
 pub struct ProjectCopy {
