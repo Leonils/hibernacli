@@ -1,16 +1,18 @@
 use itertools::Itertools;
-use toml::{Table, Value};
+use toml::Table;
 
 use crate::{
     adapters::primary_device::GlobalConfigProvider,
-    models::{
-        backup_requirement::{BackupRequirementClass, SecurityLevel},
-        project::{Project, ProjectTrackingStatus},
-        secondary_device::Device,
-    },
+    models::{project::Project, secondary_device::Device},
 };
 
-use super::device_factories_registry::DeviceFactoryRegistry;
+use super::{
+    config::{
+        from_toml::{parse_toml_global_config, ParseTomlResult},
+        to_toml::ToToml,
+    },
+    device_factories_registry::DeviceFactoryRegistry,
+};
 
 pub struct GlobalConfig {
     devices: Vec<Box<dyn Device>>,
@@ -47,6 +49,10 @@ impl GlobalConfig {
 
     pub fn get_devices(self) -> Vec<Box<dyn Device>> {
         self.devices
+    }
+
+    pub fn get_devices_iter(&self) -> impl Iterator<Item = &Box<dyn Device>> {
+        self.devices.iter()
     }
 }
 
@@ -90,15 +96,15 @@ impl GlobalConfig {
     pub fn get_projects(self) -> Vec<Project> {
         unimplemented!()
     }
+
+    pub fn get_projects_iter(&self) -> impl Iterator<Item = &Project> {
+        self.projects.iter()
+    }
 }
 
 #[derive(serde::Deserialize, serde::Serialize, Debug, Default)]
 struct PartiallyParsedGlobalConfig {
     devices: Option<Vec<Table>>,
-}
-
-#[derive(serde::Deserialize, serde::Serialize, Debug, Default)]
-struct PartiallyParsedProjectGlobalConfig {
     projects: Option<Vec<Table>>,
 }
 
@@ -109,36 +115,22 @@ impl GlobalConfig {
     ) -> Result<GlobalConfig, String> {
         let config_toml = config_provider.read_global_config()?;
 
-        let (device_errors, devices) = toml::from_str::<PartiallyParsedGlobalConfig>(&config_toml)
-            .map_err(|e| e.to_string())?
-            .devices
-            .unwrap_or(vec![])
-            .into_iter()
-            .map(|device_table| -> Result<Box<dyn Device>, String> {
-                Self::load_device_from_toml_bloc(device_table, &device_factories_registry)
-            })
-            .into_iter()
-            .partition_map(From::from);
+        let ParseTomlResult {
+            devices,
+            projects,
+            device_errors,
+            project_errors,
+        } = parse_toml_global_config(&config_toml, device_factories_registry)?;
 
-        let (project_errors, projects): (Vec<String>, Vec<Project>) =
-            toml::from_str::<PartiallyParsedProjectGlobalConfig>(&config_toml)
-                .map_err(|e| e.to_string())?
-                .projects
-                .unwrap_or(vec![])
-                .into_iter()
-                .map(|project_table| -> Result<Project, String> {
-                    Self::load_project_from_toml_bloc(project_table)
-                })
-                .into_iter()
-                .partition_map(From::from);
-
-        let mut errors: Vec<String> = device_errors;
-        errors.extend(project_errors);
-
-        Self::assert_no_errors_in_config(&errors)?;
-
+        Self::assert_no_errors_in_config(
+            &device_errors,
+            "Errors while reading devices from config",
+        )?;
+        Self::assert_no_errors_in_config(
+            &project_errors,
+            "Errors while reading projects from config",
+        )?;
         Self::assert_no_duplicate_device(&devices)?;
-
         Self::assert_no_duplicate_project_name(&projects)?;
         Self::assert_no_duplicate_project_path(&projects)?;
 
@@ -146,241 +138,80 @@ impl GlobalConfig {
     }
 
     pub fn save(&self, config_provider: &dyn GlobalConfigProvider) -> Result<(), String> {
-        let device_tables = self
-            .devices
-            .iter()
-            .map(|device| device.to_toml_table())
-            .collect::<Vec<_>>();
-
-        let config_toml = toml::to_string(&PartiallyParsedGlobalConfig {
-            devices: if device_tables.is_empty() {
-                None
-            } else {
-                Some(device_tables)
-            },
-        })
-        .map_err(|e| e.to_string())?;
+        let config_toml = self.to_toml()?;
 
         config_provider.write_global_config(&config_toml).unwrap();
 
         Ok(())
     }
 
-    fn load_device_from_toml_bloc(
-        device_table: toml::map::Map<String, toml::Value>,
-        device_factories_registry: &DeviceFactoryRegistry,
-    ) -> Result<Box<dyn Device>, String> {
-        let name = device_table
-            .get("name")
-            .ok_or_else(|| "Missing name for device".to_string())?
-            .as_str()
-            .ok_or_else(|| "Invalid string for name".to_string())?;
-
-        let device_type: &str = device_table
-            .get("type")
-            .ok_or_else(|| "Type not found".to_string())?
-            .as_str()
-            .ok_or_else(|| "Invalid string for type".to_string())?;
-
-        let factory = device_factories_registry
-            .get_device_factory(device_type)
-            .ok_or_else(|| "Device factory not found".to_string())?;
-
-        let device = factory.build_from_toml_table(&name, &device_table)?;
-        Ok(device)
-    }
-
-    fn load_project_from_toml_bloc(
-        project_table: toml::map::Map<String, toml::Value>,
-    ) -> Result<Project, String> {
-        let name = project_table
-            .get("name")
-            .ok_or_else(|| "Missing name for project".to_string())?
-            .as_str()
-            .ok_or_else(|| "Invalid string for name".to_string())?;
-
-        let path = project_table
-            .get("path")
-            .ok_or_else(|| "Missing path for project".to_string())?
-            .as_str()
-            .ok_or_else(|| "Invalid string for path".to_string())?;
-
-        let tracking_status_table = project_table
-            .get("tracking_status")
-            .ok_or_else(|| "No tracking status saved".to_string())?
-            .as_table()
-            .ok_or_else(|| "Invalid string for tracking_status".to_string())?;
-
-        let tracking_status = Self::decode_tracking_status(tracking_status_table)?;
-
-        Ok(Project::new(
-            name.to_string(),
-            path.to_string(),
-            Some(tracking_status),
-        ))
-    }
-
-    fn assert_no_errors_in_config(errors: &Vec<String>) -> Result<(), String> {
+    fn assert_no_errors_in_config(
+        errors: &Vec<String>,
+        prefix_if_errors: &str,
+    ) -> Result<(), String> {
         if !errors.is_empty() {
-            return Err(errors.join(", "));
+            return Err(format!("{}: {}", prefix_if_errors, errors.iter().join(", ")).to_string());
         }
 
         Ok(())
     }
 
     fn assert_no_duplicate_device(devices: &Vec<Box<dyn Device>>) -> Result<(), String> {
-        let device_count_by_name = devices
+        let device_names = devices
             .iter()
             .map(|device| device.get_name())
-            .fold(std::collections::HashMap::new(), |mut acc, name| {
-                *acc.entry(name).or_insert(0) += 1;
-                acc
-            })
-            .into_iter()
-            .filter(|(_, count)| *count > 1)
-            .sorted_by(|(name1, _), (name2, _)| name1.cmp(name2))
-            .collect::<Vec<_>>();
+            .collect::<Vec<String>>();
 
-        if !device_count_by_name.is_empty() {
-            return Err(format!(
-                "Duplicate device found in configuration file: {}",
-                device_count_by_name.iter().map(|(name, _)| name).join(", ")
-            ));
-        }
-
-        Ok(())
+        Self::assert_no_duplicate(
+            device_names.iter(),
+            "Duplicate device found in configuration file",
+        )
     }
 
     fn assert_no_duplicate_project_name(projects: &Vec<Project>) -> Result<(), String> {
-        let project_count_by_name = projects
-            .iter()
-            .map(|project| project.get_name())
-            .fold(std::collections::HashMap::new(), |mut acc, name| {
-                *acc.entry(name).or_insert(0) += 1;
-                acc
-            })
-            .into_iter()
-            .filter(|(_, count)| *count > 1)
-            .sorted_by(|(name1, _), (name2, _)| name1.cmp(name2))
-            .collect::<Vec<_>>();
-
-        if !project_count_by_name.is_empty() {
-            return Err(format!(
-                "Duplicated name found in configuration file for project : {}",
-                project_count_by_name
-                    .iter()
-                    .map(|(name, _)| name)
-                    .join(", ")
-            ));
-        }
-
-        Ok(())
+        Self::assert_no_duplicate(
+            projects.iter().map(|project| project.get_name()),
+            "Duplicated name found in configuration file for project",
+        )
     }
 
     fn assert_no_duplicate_project_path(projects: &Vec<Project>) -> Result<(), String> {
-        let project_count_by_path = projects
-            .iter()
-            .map(|project| project.get_location())
-            .fold(std::collections::HashMap::new(), |mut acc, path| {
-                *acc.entry(path).or_insert(0) += 1;
+        Self::assert_no_duplicate(
+            projects.iter().map(|project| project.get_location()),
+            "Duplicated path found in configuration file for project at",
+        )
+    }
+
+    fn assert_no_duplicate<'a>(
+        keys: impl Iterator<Item = &'a String>,
+        error_introduction_if_duplicate: &str,
+    ) -> Result<(), String> {
+        let duplicate_keys = keys
+            .fold(std::collections::HashMap::new(), |mut acc, key| {
+                *acc.entry(key).or_insert(0) += 1;
                 acc
             })
             .into_iter()
             .filter(|(_, count)| *count > 1)
-            .sorted_by(|(path1, _), (path2, _)| path1.cmp(path2))
+            .sorted_by(|(key1, _), (key2, _)| key1.cmp(key2))
             .collect::<Vec<_>>();
 
-        if !project_count_by_path.is_empty() {
+        if !duplicate_keys.is_empty() {
             return Err(format!(
-                "Duplicated path found in configuration file for project at : {}",
-                project_count_by_path
-                    .iter()
-                    .map(|(path, _)| path)
-                    .join(", ")
+                "{}: {}",
+                error_introduction_if_duplicate,
+                duplicate_keys.iter().map(|(key, _)| key).join(", ")
             ));
         }
 
         Ok(())
     }
+}
 
-    fn decode_tracking_status(
-        tracking_status_table: &Table,
-    ) -> Result<ProjectTrackingStatus, String> {
-        match tracking_status_table.get("type") {
-            Some(Value::String(status_str)) => match status_str.as_str() {
-                "TrackedProject" => {
-                    let backup_requirement_class_table = tracking_status_table
-                        .get("backup_requirement_class")
-                        .ok_or_else(|| "Missing backup_requirement_class section".to_string())?
-                        .as_table()
-                        .ok_or_else(|| "Invalid format for backup_requirement_class".to_string())?;
-
-                    let backup_requirement_class =
-                        Self::decode_backup_requirement_class(backup_requirement_class_table)?;
-
-                    Ok(ProjectTrackingStatus::TrackedProject {
-                        backup_requirement_class,
-                        last_update: None, // Handle last_update if present in your TOML
-                        current_copies: vec![], // Handle current_copies if present in your TOML
-                    })
-                }
-                "UntrackedProject" => Ok(ProjectTrackingStatus::UntrackedProject),
-                "IgnoredProject" => Ok(ProjectTrackingStatus::IgnoredProject),
-                _ => Err("Unknown tracking status type".to_string()),
-            },
-            _ => Err("Missing tracking status type".to_string()),
-        }
-    }
-
-    fn decode_backup_requirement_class(table: &Table) -> Result<BackupRequirementClass, String> {
-        let target_copies = table
-            .get("target_copies")
-            .ok_or_else(|| "Missing target_copies field".to_string())?
-            .as_integer()
-            .ok_or_else(|| "Invalid format for target_copies".to_string())?
-            as u32;
-
-        let target_locations = table
-            .get("target_locations")
-            .ok_or_else(|| "Missing target_locations field".to_string())?
-            .as_integer()
-            .ok_or_else(|| "Invalid format for target_locations".to_string())?
-            as u32;
-
-        let min_security_level_str = table
-            .get("min_security_level")
-            .ok_or_else(|| "Missing min_security_level field".to_string())?
-            .as_str()
-            .ok_or_else(|| "Invalid format for min_security_level".to_string())?;
-
-        let min_security_level = match min_security_level_str {
-            "NetworkPublic" => SecurityLevel::NetworkPublic,
-            "NetworkUnreferenced" => SecurityLevel::NetworkUnreferenced,
-            "NetworkUntrustedRestricted" => SecurityLevel::NetworkUntrustedRestricted,
-            "NetworkTrustedRestricted" => SecurityLevel::NetworkTrustedRestricted,
-            "NetworkLocal" => SecurityLevel::NetworkLocal,
-            "Local" => SecurityLevel::Local,
-            "LocalMaxSecurity" => SecurityLevel::LocalMaxSecurity,
-            _ => {
-                return Err(format!(
-                    "Invalid value for min_security_level: {}",
-                    min_security_level_str
-                ))
-            }
-        };
-
-        let name = table
-            .get("name")
-            .ok_or_else(|| "Missing name field".to_string())?
-            .as_str()
-            .ok_or_else(|| "Invalid format for name".to_string())?;
-
-        Ok(BackupRequirementClass::new(
-            target_copies,
-            target_locations,
-            min_security_level,
-            name.to_string(),
-        ))
+#[cfg(test)]
+impl GlobalConfig {
+    pub fn new(devices: Vec<Box<dyn Device>>, projects: Vec<Project>) -> Self {
+        Self { devices, projects }
     }
 }
 
@@ -400,7 +231,7 @@ mod tests {
             },
         },
         models::{
-            backup_requirement::{BackupRequirementClass, SecurityLevel},
+            backup_requirement::SecurityLevel,
             project::{Project, ProjectTrackingStatus},
             secondary_device::DeviceFactory,
         },
@@ -631,7 +462,10 @@ mod tests {
         );
         let config = GlobalConfig::load(&config_provider, &device_factories_registry);
         assert!(config.is_err());
-        assert_eq!(config.err().unwrap(), "Device factory not found");
+        assert_eq!(
+            config.err().unwrap(),
+            "Errors while reading devices from config: Device factory not found"
+        );
     }
 
     #[test]
@@ -645,7 +479,10 @@ mod tests {
         );
         let config = GlobalConfig::load(&config_provider, &device_factories_registry);
         assert!(config.is_err());
-        assert_eq!(config.err().unwrap(), "Missing name for device");
+        assert_eq!(
+            config.err().unwrap(),
+            "Errors while reading devices from config: Missing 'name' field"
+        );
     }
 
     #[test]
@@ -659,7 +496,10 @@ mod tests {
         );
         let config = GlobalConfig::load(&config_provider, &device_factories_registry);
         assert!(config.is_err());
-        assert_eq!(config.err().unwrap(), "Missing name for project");
+        assert_eq!(
+            config.err().unwrap(),
+            "Errors while reading projects from config: Missing 'name' field"
+        );
     }
 
     #[test]
@@ -673,7 +513,10 @@ mod tests {
         );
         let config = GlobalConfig::load(&config_provider, &device_factories_registry);
         assert!(config.is_err());
-        assert_eq!(config.err().unwrap(), "Missing path for project");
+        assert_eq!(
+            config.err().unwrap(),
+            "Errors while reading projects from config: Missing 'path' field"
+        );
     }
 
     #[test]
@@ -693,7 +536,7 @@ mod tests {
         assert!(config.is_err());
         assert_eq!(
             config.err().unwrap(),
-            "Missing name for device, Device factory not found"
+            "Errors while reading devices from config: Missing 'name' field, Device factory not found"
         );
     }
 
@@ -713,7 +556,7 @@ mod tests {
         assert!(config.is_err());
         assert_eq!(
             config.err().unwrap(),
-            "Missing path for project, Missing name for project"
+            "Errors while reading projects from config: Missing 'path' field, Missing 'name' field"
         );
     }
 
@@ -755,7 +598,10 @@ mod tests {
         );
         let config = GlobalConfig::load(&config_provider, &registry);
         assert!(config.is_err());
-        assert_eq!(config.err().unwrap(), "Missing parameter");
+        assert_eq!(
+            config.err().unwrap(),
+            "Errors while reading devices from config: Missing parameter"
+        );
     }
 
     #[test]
@@ -800,7 +646,7 @@ mod tests {
         assert!(config.is_err());
         assert_eq!(
             config.err().unwrap(),
-            "Duplicated name found in configuration file for project : MyProject"
+            "Duplicated name found in configuration file for project: MyProject"
         );
     }
 
@@ -824,7 +670,7 @@ mod tests {
         assert!(config.is_err());
         assert_eq!(
             config.err().unwrap(),
-            "Duplicated path found in configuration file for project at : /path"
+            "Duplicated path found in configuration file for project at: /path"
         );
     }
 
@@ -900,43 +746,6 @@ mod tests {
         );
 
         assert_eq!(global_config.devices.len(), 1);
-    }
-
-    #[test]
-    fn when_saving_config_it_shall_call_save_on_config_provider() {
-        let mut config_provider = MockGlobalConfigProvider::new();
-        config_provider
-            .expect_write_global_config()
-            .times(1)
-            .with(eq(""))
-            .return_const(Ok(()));
-
-        let global_config = GlobalConfig {
-            devices: vec![],
-            projects: vec![],
-        };
-        global_config.save(&config_provider).unwrap();
-    }
-
-    #[test]
-    fn when_saving_config_with_some_devices_it_shall_save_config_with_devices() {
-        let mut config_provider = MockGlobalConfigProvider::new();
-        config_provider
-            .expect_write_global_config()
-            .times(1)
-            .with(eq(r#"[[devices]]
-name = "MockDevice"
-type = "MockDevice"
-"#))
-            .return_const(Ok(()));
-
-        let device = MockDeviceFactory.build().unwrap();
-        let global_config = GlobalConfig {
-            devices: vec![device],
-            projects: vec![],
-        };
-
-        global_config.save(&config_provider).unwrap();
     }
 
     #[test]
@@ -1047,7 +856,10 @@ type = "MockDeviceWithParameters"
         );
         let config = GlobalConfig::load(&config_provider, &device_factories_registry);
         assert!(config.is_err());
-        assert_eq!(config.err().unwrap(), "No tracking status saved");
+        assert_eq!(
+            config.err().unwrap(),
+            "Errors while reading projects from config: No tracking status saved"
+        );
     }
 
     #[test]
@@ -1063,7 +875,10 @@ type = "MockDeviceWithParameters"
         );
         let config = GlobalConfig::load(&config_provider, &device_factories_registry);
         assert!(config.is_err());
-        assert_eq!(config.err().unwrap(), "Unknown tracking status type");
+        assert_eq!(
+            config.err().unwrap(),
+            "Errors while reading projects from config: Unknown tracking status type"
+        );
     }
 
     #[test]
@@ -1132,7 +947,7 @@ type = "MockDeviceWithParameters"
         assert!(config.is_err());
         assert_eq!(
             config.err().unwrap(),
-            "Missing backup_requirement_class section"
+            "Errors while reading projects from config: Missing 'backup_requirement_class' section"
         );
     }
 
