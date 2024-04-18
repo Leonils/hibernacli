@@ -7,7 +7,8 @@ use crate::devices::local_file_storage::{
     LocalFileStorage, StandardFileSystem, StandardPathProvider,
 };
 use crate::devices::mounted_folder::MountedFolderFactory;
-use crate::models::secondary_device::Device;
+use crate::models::question::QuestionType;
+use crate::models::secondary_device::DeviceFactoryKey;
 use std::rc::Rc;
 
 const HELP: &str = r#"
@@ -24,8 +25,8 @@ Commands:
 
 const INVALID_COMMAND: &str = "Invalid command, use 'help' to display available commands";
 const VERSION: &str = env!("CARGO_PKG_VERSION");
-
-const DEFAULT_CONFIG: &str = r#""#;
+const DEFAULT_CONFIG: &str = "";
+const NEW_DEVICE_INIT: &str = "Create a new device";
 
 #[cfg_attr(test, automock)]
 trait UserInterface {
@@ -87,6 +88,21 @@ impl<T: UserInterface, U: DeviceOperations> CommandRunner<T, U> {
         }
     }
 
+    fn ask_question(&self, question_type: &QuestionType, question_statement: &str) -> String {
+        match question_type {
+            QuestionType::String => self.ask_for_string(question_statement),
+            _ => panic!("Unsupported question type"),
+        }
+    }
+
+    fn ask_for_string(&self, message: &str) -> String {
+        self.display_message(&message);
+        match self.read_string() {
+            Ok(answer) => answer,
+            Err(_) => self.ask_for_string(message),
+        }
+    }
+
     fn display_help(&self) {
         let _ = self.display_message(&HELP);
     }
@@ -107,6 +123,7 @@ impl<T: UserInterface, U: DeviceOperations> CommandRunner<T, U> {
 
         match args[2].as_str() {
             "ls" | "list" => self.display_device_list(),
+            "new" => self.find_device_factory_create_new_device(args),
             _ => {
                 self.display_invalid_command();
             }
@@ -115,7 +132,6 @@ impl<T: UserInterface, U: DeviceOperations> CommandRunner<T, U> {
 
     fn display_device_list(&mut self) {
         let _ = self.display_message(&"Device list:");
-        println!("get the list of devices");
         let devices = self.operations.list();
         match devices {
             Ok(devices) => {
@@ -125,6 +141,56 @@ impl<T: UserInterface, U: DeviceOperations> CommandRunner<T, U> {
             }
             Err(e) => {
                 let _ = self.display_message(&e);
+            }
+        }
+    }
+
+    fn find_device_factory_create_new_device(&mut self, args: Vec<String>) {
+        if args.len() < 4 {
+            self.display_invalid_command();
+            return;
+        }
+        let device_key = args[3].as_str();
+        match self
+            .operations
+            .get_available_device_factories()
+            .iter()
+            .find(|&key| key.key == device_key)
+        {
+            Some(key) => self.create_new_device(key),
+            None => self.display_message(&"No such device configuration exists"),
+        }
+    }
+
+    fn create_new_device(&mut self, key: &DeviceFactoryKey) {
+        self.display_message("Creating new device of type:");
+        match self.operations.get_device_factory(key.key.clone()) {
+            Some(mut device_factory) => {
+                while device_factory.has_next() {
+                    let question_type = device_factory.get_question_type();
+                    let question_statement = device_factory.get_question_statement();
+                    let answer = self.ask_question(&question_type, &question_statement);
+                    if let Some(device_factory) = Rc::get_mut(&mut device_factory) {
+                        device_factory.set_question_answer(answer);
+                    }
+                }
+                let device = device_factory.build();
+                match device {
+                    Ok(device) => match self.operations.add_device(device) {
+                        Ok(_) => {
+                            self.display_message(&"Device created successfully");
+                        }
+                        Err(e) => {
+                            self.display_message(&e);
+                        }
+                    },
+                    Err(e) => {
+                        self.display_message(&e);
+                    }
+                }
+            }
+            None => {
+                self.display_message(&"No such device configuration exists");
             }
         }
     }
@@ -155,7 +221,7 @@ pub fn run(args: Vec<String>) {
 mod tests {
     use super::*;
     use crate::adapters::operations::device::MockDeviceOperations;
-    use crate::models::secondary_device::MockDevice;
+    use crate::models::secondary_device::{MockDevice, MockDeviceFactory};
     use mockall::predicate::eq;
 
     #[test]
@@ -329,24 +395,41 @@ mod tests {
     fn display_list_of_devices() {
         let mut console = MockUserInterface::new();
         let mut device_operations = MockDeviceOperations::new();
-        let mut device = MockDevice::new();
 
-        // device
-        //     .expect_get_name()
-        //     .times(1)
-        //     .returning(move || "USBkey".to_string());
-
-        device_operations
-            .expect_list()
-            .times(1)
-            .returning(|| Ok(vec![Box::new(MockDevice::new())]));
+        device_operations.expect_list().times(1).returning(move || {
+            let mut device = MockDevice::new();
+            device
+                .expect_get_name()
+                .times(1)
+                .returning(move || "USBkey".to_string());
+            Ok(vec![Box::new(device)])
+        });
 
         console
             .expect_write()
-            .times(1)
+            .times(2)
             .withf(|msg| msg.contains("USBkey") || msg.contains("Device"))
             .return_const(Ok(()));
 
+        let mut command_runner = CommandRunner {
+            console,
+            operations: device_operations,
+        };
+        command_runner.run(vec![
+            "/path/to/executable".to_string(),
+            "device".to_string(),
+            "list".to_string(),
+        ]);
+    }
+
+    #[test]
+    fn display_invalid_command_when_running_with_device_command_and_no_subcommand() {
+        let mut console = MockUserInterface::new();
+        console
+            .expect_write()
+            .times(1)
+            .with(eq(INVALID_COMMAND.to_string()))
+            .return_const(Ok(()));
         let operations = MockDeviceOperations::new();
         let mut command_runner = CommandRunner {
             console,
@@ -355,7 +438,59 @@ mod tests {
         command_runner.run(vec![
             "/path/to/executable".to_string(),
             "device".to_string(),
-            "list".to_string(),
+        ]);
+    }
+
+    #[test]
+    fn creating_a_new_usb_key() {
+        let question = "What is the name of the device?";
+        let mut console = MockUserInterface::new();
+        console
+            .expect_write()
+            .times(1)
+            .withf(move |msg| {
+                msg.contains(&question)
+                    || msg.contains(NEW_DEVICE_INIT)
+                    || msg.contains("Creating new device of type:")
+            })
+            .return_const(Ok(()));
+
+        let mut device_factory = MockDeviceFactory::new();
+        device_factory.expect_has_next().times(1).returning(|| true);
+        device_factory
+            .expect_get_question_type()
+            .times(1)
+            .return_const(QuestionType::String);
+        device_factory
+            .expect_get_question_statement()
+            .times(1)
+            .return_const(question.to_string());
+
+        let mut operations = MockDeviceOperations::new();
+        operations
+            .expect_get_available_device_factories()
+            .times(1)
+            .returning(|| {
+                vec![DeviceFactoryKey {
+                    key: "mounted_folder".to_string(),
+                    readable_name: "Mounted folder".to_string(),
+                }]
+            });
+        operations
+            .expect_get_device_factory()
+            .times(1)
+            .with(eq("mounted_folder".to_string()))
+            .return_const(Some(Rc::new(device_factory)));
+        let mut command_runner = CommandRunner {
+            console,
+            operations,
+        };
+
+        command_runner.run(vec![
+            "/path/to/executable".to_string(),
+            "device".to_string(),
+            "new".to_string(),
+            "mounted_folder".to_string(),
         ]);
     }
 }
