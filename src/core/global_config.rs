@@ -174,7 +174,7 @@ impl GlobalConfig {
             .as_str()
             .ok_or_else(|| "Invalid string for path".to_string())?;
 
-        Ok(Project::new(name.to_string(), path.to_string()))
+        Ok(Project::new(name.to_string(), path.to_string(), None))
     }
 
     fn assert_no_errors_in_devices(errors: &Vec<String>) -> Result<(), String> {
@@ -374,7 +374,7 @@ mod tests {
 
         [[projects]]
     name = "MySecondAwesomeProject"
-    path = "/tmp"
+    path = "/root"
     "#,
         );
         let config = GlobalConfig::load(&config_provider, &device_factories_registry).unwrap();
