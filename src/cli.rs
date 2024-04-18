@@ -5,7 +5,6 @@ use crate::adapters::operations::device::DeviceOperations;
 use crate::adapters::operations::project::ProjectOperations;
 use crate::models::question::QuestionType;
 use crate::models::secondary_device::DeviceFactoryKey;
-use std::rc::Rc;
 
 const HELP: &str = r#"
 HibernaCLI
@@ -25,6 +24,7 @@ Options:
 "#;
 
 const INVALID_COMMAND: &str = "Invalid command, use 'help' to display available commands";
+const TODO_COMMAND: &str = "This command is not implemented yet, but it will be soon!";
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[cfg_attr(test, automock)]
@@ -108,6 +108,7 @@ impl<'a, T: UserInterface, U: DeviceOperations, V: ProjectOperations> CommandRun
         self.display_message(message);
         self.read_string()
             .map_err(|_| self.ask_for_string(message))
+            .map(|s| s.trim().to_string())
             .unwrap()
     }
 
@@ -116,6 +117,7 @@ impl<'a, T: UserInterface, U: DeviceOperations, V: ProjectOperations> CommandRun
         self.display_message("Enter a valid Unix path");
         self.read_string()
             .map_err(|_| self.ask_for_unix_path(message))
+            .map(|s| s.trim().to_string())
             .unwrap()
     }
 
@@ -129,6 +131,10 @@ impl<'a, T: UserInterface, U: DeviceOperations, V: ProjectOperations> CommandRun
 
     fn display_invalid_command(&self) {
         self.display_message(INVALID_COMMAND);
+    }
+
+    fn display_todo(&self) {
+        self.display_message(TODO_COMMAND);
     }
 
     fn run_device_command(&self, args: Vec<String>) {
@@ -176,15 +182,14 @@ impl<'a, T: UserInterface, U: DeviceOperations, V: ProjectOperations> CommandRun
             .device_operations
             .get_device_factory(key.key.clone())
             .ok_or("No such device configuration exists")?;
+
         while device_factory.has_next() {
             let question_type = device_factory.get_question_type();
             let question_statement = device_factory.get_question_statement();
             let answer = self.ask_question(&question_type, &question_statement);
-            if let Some(device_factory) = Rc::get_mut(&mut device_factory) {
-                device_factory
-                    .set_question_answer(answer)
-                    .map_err(|_| "Failed to set answer")?;
-            }
+            device_factory
+                .set_question_answer(answer)
+                .map_err(|_| "Failed to set answer")?;
         }
         let device = device_factory
             .build()
@@ -220,6 +225,7 @@ impl<'a, T: UserInterface, U: DeviceOperations, V: ProjectOperations> CommandRun
             "ls" | "list" => self
                 .display_project_list()
                 .unwrap_or_else(|e| self.display_message(&e)),
+            "new" | "rm" | "remove" => self.display_todo(),
             _ => {
                 self.display_invalid_command();
             }
@@ -495,7 +501,7 @@ mod tests {
                     .expect_build()
                     .times(1)
                     .returning(|| Ok(Box::new(MockDevice::new())));
-                Some(Rc::new(device_factory))
+                Some(Box::new(device_factory))
             });
         device_operations
             .expect_add_device()
@@ -570,7 +576,7 @@ mod tests {
                     .expect_build()
                     .times(1)
                     .returning(|| Ok(Box::new(MockDevice::new())));
-                Some(Rc::new(device_factory))
+                Some(Box::new(device_factory))
             });
         device_operations
             .expect_add_device()

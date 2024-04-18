@@ -241,15 +241,13 @@ mod tests {
 
     fn get_mock_device_factory_registry() -> DeviceFactoryRegistry {
         let mut registry = DeviceFactoryRegistry::new();
-        registry.register_device(
-            "MockDevice".to_string(),
-            "MockDevice".to_string(),
-            Rc::new(MockDeviceFactory),
-        );
+        registry.register_device("MockDevice".to_string(), "MockDevice".to_string(), || {
+            Box::new(MockDeviceFactory)
+        });
         registry.register_device(
             "MockDeviceWithParameters".to_string(),
             "MockDeviceWithParameters".to_string(),
-            Rc::new(MockDeviceWithParametersFactory),
+            || Box::new(MockDeviceWithParametersFactory),
         );
         registry
     }
