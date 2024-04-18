@@ -73,7 +73,7 @@ impl<T: UserInterface, U: DeviceOperations> CommandRunner<T, U> {
     }
 
     fn display_message(&self, message: &str) {
-        let _ = self.console.write(message);
+        self.console.write(message);
     }
 
     fn read_string(&self) -> Result<String, String> {
@@ -96,7 +96,7 @@ impl<T: UserInterface, U: DeviceOperations> CommandRunner<T, U> {
     }
 
     fn ask_for_string(&self, message: &str) -> String {
-        self.display_message(&message);
+        self.display_message(message);
         match self.read_string() {
             Ok(answer) => answer,
             Err(_) => self.ask_for_string(message),
@@ -104,15 +104,15 @@ impl<T: UserInterface, U: DeviceOperations> CommandRunner<T, U> {
     }
 
     fn display_help(&self) {
-        let _ = self.display_message(&HELP);
+        self.display_message(HELP);
     }
 
     fn display_version(&self) {
-        let _ = self.display_message(&VERSION);
+        self.display_message(VERSION);
     }
 
     fn display_invalid_command(&self) {
-        let _ = self.display_message(&INVALID_COMMAND);
+        self.display_message(INVALID_COMMAND);
     }
 
     fn run_device_command(&mut self, args: Vec<String>) {
@@ -124,6 +124,7 @@ impl<T: UserInterface, U: DeviceOperations> CommandRunner<T, U> {
         match args[2].as_str() {
             "ls" | "list" => self.display_device_list(),
             "new" => self.find_device_factory_create_new_device(args),
+            "rm" | "remove" => self.remove_device(args),
             _ => {
                 self.display_invalid_command();
             }
@@ -131,16 +132,16 @@ impl<T: UserInterface, U: DeviceOperations> CommandRunner<T, U> {
     }
 
     fn display_device_list(&mut self) {
-        let _ = self.display_message(&"Device list:");
+        self.display_message("Device list:");
         let devices = self.operations.list();
         match devices {
             Ok(devices) => {
                 for device in devices {
-                    let _ = self.display_message(&format!("Device: {}", device.get_name()));
+                    self.display_message(&format!("Device: {}", device.get_name()));
                 }
             }
             Err(e) => {
-                let _ = self.display_message(&e);
+                self.display_message(&e);
             }
         }
     }
@@ -158,7 +159,7 @@ impl<T: UserInterface, U: DeviceOperations> CommandRunner<T, U> {
             .find(|&key| key.key == device_key)
         {
             Some(key) => self.create_new_device(key),
-            None => self.display_message(&"No such device configuration exists"),
+            None => self.display_message("No such device configuration exists"),
         }
     }
 
@@ -178,7 +179,7 @@ impl<T: UserInterface, U: DeviceOperations> CommandRunner<T, U> {
                 match device {
                     Ok(device) => match self.operations.add_device(device) {
                         Ok(_) => {
-                            self.display_message(&"Device created successfully");
+                            self.display_message("Device created successfully");
                         }
                         Err(e) => {
                             self.display_message(&e);
@@ -190,7 +191,23 @@ impl<T: UserInterface, U: DeviceOperations> CommandRunner<T, U> {
                 }
             }
             None => {
-                self.display_message(&"No such device configuration exists");
+                self.display_message("No such device configuration exists");
+            }
+        }
+    }
+
+    fn remove_device(&mut self, args: Vec<String>) {
+        if args.len() < 4 {
+            self.display_invalid_command();
+            return;
+        }
+        let device_name = args[3].as_str();
+        match self.operations.remove_by_name(device_name.to_string()) {
+            Ok(_) => {
+                self.display_message("Removed device successfully");
+            }
+            Err(e) => {
+                self.display_message(&e);
             }
         }
     }
@@ -227,7 +244,7 @@ mod tests {
     #[test]
     fn test_display_message() {
         let mut console = MockUserInterface::new();
-        let mut message = "Hello, world!".to_string();
+        let message = "Hello, world!".to_string();
         console
             .expect_write()
             .times(1)
@@ -238,7 +255,7 @@ mod tests {
             console,
             operations,
         };
-        let _ = command_runner.display_message(&mut message);
+        command_runner.display_message(&message);
     }
 
     #[test]
@@ -298,7 +315,7 @@ mod tests {
             .with(eq(HELP.to_string()))
             .return_const(Ok(()));
         let operations = MockDeviceOperations::new();
-        let mut command_runner = CommandRunner {
+        let command_runner = CommandRunner {
             console,
             operations,
         };
@@ -444,27 +461,22 @@ mod tests {
     #[test]
     fn creating_a_new_usb_key() {
         let question = "What is the name of the device?";
+        let friendly_name = "USB key";
         let mut console = MockUserInterface::new();
         console
             .expect_write()
-            .times(1)
+            .times(3)
             .withf(move |msg| {
                 msg.contains(&question)
                     || msg.contains(NEW_DEVICE_INIT)
                     || msg.contains("Creating new device of type:")
+                    || msg.contains("Device created successfully")
             })
             .return_const(Ok(()));
-
-        let mut device_factory = MockDeviceFactory::new();
-        device_factory.expect_has_next().times(1).returning(|| true);
-        device_factory
-            .expect_get_question_type()
+        console
+            .expect_read()
             .times(1)
-            .return_const(QuestionType::String);
-        device_factory
-            .expect_get_question_statement()
-            .times(1)
-            .return_const(question.to_string());
+            .returning(|| Ok(friendly_name.to_string()));
 
         let mut operations = MockDeviceOperations::new();
         operations
@@ -480,7 +492,34 @@ mod tests {
             .expect_get_device_factory()
             .times(1)
             .with(eq("mounted_folder".to_string()))
-            .return_const(Some(Rc::new(device_factory)));
+            .returning(|_| {
+                let mut device_factory = MockDeviceFactory::new();
+                device_factory.expect_has_next().times(1).returning(|| true);
+                device_factory
+                    .expect_has_next()
+                    .times(1)
+                    .returning(|| false);
+                device_factory
+                    .expect_get_question_type()
+                    .times(1)
+                    .return_const(QuestionType::String);
+                device_factory
+                    .expect_get_question_statement()
+                    .times(1)
+                    .return_const(question.to_string());
+                device_factory
+                    .expect_set_question_answer()
+                    .times(1)
+                    .with(eq(friendly_name.to_string()))
+                    .return_const(Ok(()));
+                device_factory
+                    .expect_build()
+                    .times(1)
+                    .returning(|| Ok(Box::new(MockDevice::new())));
+                Some(Rc::new(device_factory))
+            });
+        operations.expect_add_device().times(1).return_const(Ok(()));
+
         let mut command_runner = CommandRunner {
             console,
             operations,
@@ -491,6 +530,33 @@ mod tests {
             "device".to_string(),
             "new".to_string(),
             "mounted_folder".to_string(),
+        ]);
+    }
+
+    #[test]
+    fn deleting_a_usb_key() {
+        let mut console = MockUserInterface::new();
+        console
+            .expect_write()
+            .times(1)
+            .with(eq("Removed device successfully"))
+            .return_const(Ok(()));
+        let mut device_operations = MockDeviceOperations::new();
+        device_operations
+            .expect_remove_by_name()
+            .times(1)
+            .with(eq("USBkey".to_string()))
+            .return_const(Ok(()));
+
+        let mut command_runner = CommandRunner {
+            console,
+            operations: device_operations,
+        };
+        command_runner.run(vec![
+            "/path/to/executable".to_string(),
+            "device".to_string(),
+            "remove".to_string(),
+            "USBkey".to_string(),
         ]);
     }
 }
