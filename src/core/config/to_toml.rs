@@ -6,7 +6,7 @@ use crate::{
     core::global_config::GlobalConfig,
     models::{
         backup_requirement::BackupRequirementClass,
-        project::{Project, ProjectCopy, ProjectTrackingStatus},
+        project::{Project, ProjectTrackingStatus},
     },
 };
 
@@ -16,12 +16,8 @@ struct PartiallyParsedGlobalConfig {
     projects: Option<Vec<Table>>,
 }
 
-pub trait ToTomlValue {
-    fn to_toml_value(&self) -> Result<toml::Value, String>;
-}
-
 pub trait ToTomlTable {
-    fn to_toml_table(&self) -> Result<toml::Table, String>;
+    fn to_toml_table(&self) -> Table;
 }
 
 pub trait ToToml {
@@ -30,6 +26,11 @@ pub trait ToToml {
 
 impl ToToml for GlobalConfig {
     fn to_toml(&self) -> Result<String, String> {
+        let project_tables = self
+            .get_projects_iter()
+            .map(|project| project.to_toml_table())
+            .collect::<Vec<_>>();
+
         let device_tables = self
             .get_devices_iter()
             .map(|device| device.to_toml_table())
@@ -41,7 +42,11 @@ impl ToToml for GlobalConfig {
             } else {
                 Some(device_tables)
             },
-            projects: None,
+            projects: if project_tables.is_empty() {
+                None
+            } else {
+                Some(project_tables)
+            },
         })
         .map_err(|e| e.to_string())?;
 
@@ -50,7 +55,7 @@ impl ToToml for GlobalConfig {
 }
 
 impl ToTomlTable for BackupRequirementClass {
-    fn to_toml_table(&self) -> Result<toml::Table, String> {
+    fn to_toml_table(&self) -> Table {
         let mut table = Table::new();
         table.insert(
             "target_copies".to_string(),
@@ -69,20 +74,20 @@ impl ToTomlTable for BackupRequirementClass {
             toml::Value::String(self.get_name().clone()),
         );
 
-        Ok(table)
+        table
     }
 }
 
 impl ToToml for BackupRequirementClass {
     fn to_toml(&self) -> Result<String, String> {
-        let toml_value = self.to_toml_table()?;
+        let toml_value = self.to_toml_table();
         let toml = toml_value.to_string();
         Ok(toml)
     }
 }
 
 impl ToTomlTable for ProjectTrackingStatus {
-    fn to_toml_table(&self) -> Result<toml::Table, String> {
+    fn to_toml_table(&self) -> Table {
         let type_name = match self {
             ProjectTrackingStatus::TrackedProject { .. } => "TrackedProject",
             ProjectTrackingStatus::UntrackedProject => "UntrackedProject",
@@ -103,7 +108,7 @@ impl ToTomlTable for ProjectTrackingStatus {
             } => {
                 table.insert(
                     "backup_requirement_class".to_string(),
-                    toml::Value::Table(backup_requirement_class.to_toml_table()?),
+                    toml::Value::Table(backup_requirement_class.to_toml_table()),
                 );
                 table.insert(
                     "last_update".to_string(),
@@ -125,20 +130,20 @@ impl ToTomlTable for ProjectTrackingStatus {
             _ => {}
         }
 
-        Ok(table)
+        table
     }
 }
 
 impl ToToml for ProjectTrackingStatus {
     fn to_toml(&self) -> Result<String, String> {
-        let toml_value = self.to_toml_table()?;
+        let toml_value = self.to_toml_table();
         let toml = toml_value.to_string();
         Ok(toml)
     }
 }
 
 impl ToTomlTable for Project {
-    fn to_toml_table(&self) -> Result<toml::Table, String> {
+    fn to_toml_table(&self) -> Table {
         let mut table = Table::new();
         table.insert(
             "name".to_string(),
@@ -150,16 +155,16 @@ impl ToTomlTable for Project {
         );
         table.insert(
             "tracking_status".to_string(),
-            toml::Value::Table(self.get_tracking_status().to_toml_table()?),
+            toml::Value::Table(self.get_tracking_status().to_toml_table()),
         );
 
-        Ok(table)
+        table
     }
 }
 
 impl ToToml for Project {
     fn to_toml(&self) -> Result<String, String> {
-        let table = self.to_toml_table()?;
+        let table = self.to_toml_table();
         let toml = toml::to_string(&table).map_err(|e| e.to_string())?;
         Ok(toml)
     }
@@ -309,6 +314,145 @@ min_security_level = "NetworkUntrustedRestricted"
 name = "Default"
 target_copies = 3
 target_locations = 2
+"#
+        );
+    }
+
+    #[test]
+    fn when_converting_config_with_one_project_to_toml_it_shall_return_toml() {
+        let project = Project::new(
+            "MyProject".to_string(),
+            "MyLocation".to_string(),
+            Some(ProjectTrackingStatus::TrackedProject {
+                last_update: Some(SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(100)),
+                backup_requirement_class: BackupRequirementClass::default(),
+                current_copies: vec![],
+            }),
+        );
+
+        let global_config = GlobalConfig::new(vec![], vec![project]);
+        let toml = global_config.to_toml().unwrap();
+        assert_eq!(
+            toml,
+            r#"[[projects]]
+location = "MyLocation"
+name = "MyProject"
+
+[projects.tracking_status]
+last_update = "100"
+type = "TrackedProject"
+
+[projects.tracking_status.backup_requirement_class]
+min_security_level = "NetworkUntrustedRestricted"
+name = "Default"
+target_copies = 3
+target_locations = 2
+"#
+        );
+    }
+
+    #[test]
+    fn when_converting_config_with_multiple_projects_to_toml_it_shall_return_toml() {
+        let project1 = Project::new(
+            "MyProject".to_string(),
+            "MyLocation".to_string(),
+            Some(ProjectTrackingStatus::TrackedProject {
+                last_update: Some(SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(100)),
+                backup_requirement_class: BackupRequirementClass::default(),
+                current_copies: vec![],
+            }),
+        );
+
+        let project2 = Project::new(
+            "MyProject2".to_string(),
+            "MyLocation2".to_string(),
+            Some(ProjectTrackingStatus::UntrackedProject),
+        );
+
+        let global_config = GlobalConfig::new(vec![], vec![project1, project2]);
+        let toml = global_config.to_toml().unwrap();
+        assert_eq!(
+            toml,
+            r#"[[projects]]
+location = "MyLocation"
+name = "MyProject"
+
+[projects.tracking_status]
+last_update = "100"
+type = "TrackedProject"
+
+[projects.tracking_status.backup_requirement_class]
+min_security_level = "NetworkUntrustedRestricted"
+name = "Default"
+target_copies = 3
+target_locations = 2
+
+[[projects]]
+location = "MyLocation2"
+name = "MyProject2"
+
+[projects.tracking_status]
+type = "UntrackedProject"
+"#
+        );
+    }
+
+    #[test]
+    fn when_converting_config_with_2_devices_and_2_projects_to_toml_it_shall_return_toml() {
+        let device1 = MockDevice::new("MockDevice");
+        let device2 = MockDeviceWithParameters::new("MyDevice", "MyParameter");
+        let project1 = Project::new(
+            "MyProject".to_string(),
+            "MyLocation".to_string(),
+            Some(ProjectTrackingStatus::TrackedProject {
+                last_update: Some(SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(100)),
+                backup_requirement_class: BackupRequirementClass::default(),
+                current_copies: vec![],
+            }),
+        );
+
+        let project2 = Project::new(
+            "MyProject2".to_string(),
+            "MyLocation2".to_string(),
+            Some(ProjectTrackingStatus::UntrackedProject),
+        );
+
+        let global_config = GlobalConfig::new(
+            vec![Box::new(device1), Box::new(device2)],
+            vec![project1, project2],
+        );
+        let toml = global_config.to_toml().unwrap();
+        assert_eq!(
+            toml,
+            r#"[[devices]]
+name = "MockDevice"
+type = "MockDevice"
+
+[[devices]]
+name = "MyDevice"
+parameter = "MyParameter"
+type = "MockDeviceWithParameters"
+
+[[projects]]
+location = "MyLocation"
+name = "MyProject"
+
+[projects.tracking_status]
+last_update = "100"
+type = "TrackedProject"
+
+[projects.tracking_status.backup_requirement_class]
+min_security_level = "NetworkUntrustedRestricted"
+name = "Default"
+target_copies = 3
+target_locations = 2
+
+[[projects]]
+location = "MyLocation2"
+name = "MyProject2"
+
+[projects.tracking_status]
+type = "UntrackedProject"
 "#
         );
     }

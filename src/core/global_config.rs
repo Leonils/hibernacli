@@ -96,6 +96,10 @@ impl GlobalConfig {
     pub fn get_projects(self) -> Vec<Project> {
         unimplemented!()
     }
+
+    pub fn get_projects_iter(&self) -> impl Iterator<Item = &Project> {
+        self.projects.iter()
+    }
 }
 
 #[derive(serde::Deserialize, serde::Serialize, Debug, Default)]
