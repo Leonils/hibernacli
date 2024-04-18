@@ -1,4 +1,4 @@
-use std::borrow::Borrow;
+use std::str::FromStr;
 
 use itertools::Itertools;
 use toml::{Table, Value};
@@ -297,47 +297,11 @@ impl GlobalConfig {
     }
 
     fn decode_backup_requirement_class(table: &Table) -> Result<BackupRequirementClass, String> {
-        let target_copies = table
-            .get("target_copies")
-            .ok_or_else(|| "Missing target_copies field".to_string())?
-            .as_integer()
-            .ok_or_else(|| "Invalid format for target_copies".to_string())?
-            as u32;
-
-        let target_locations = table
-            .get("target_locations")
-            .ok_or_else(|| "Missing target_locations field".to_string())?
-            .as_integer()
-            .ok_or_else(|| "Invalid format for target_locations".to_string())?
-            as u32;
-
-        let min_security_level_str = table
-            .get("min_security_level")
-            .ok_or_else(|| "Missing min_security_level field".to_string())?
-            .as_str()
-            .ok_or_else(|| "Invalid format for min_security_level".to_string())?;
-
-        let min_security_level = match min_security_level_str {
-            "NetworkPublic" => SecurityLevel::NetworkPublic,
-            "NetworkUnreferenced" => SecurityLevel::NetworkUnreferenced,
-            "NetworkUntrustedRestricted" => SecurityLevel::NetworkUntrustedRestricted,
-            "NetworkTrustedRestricted" => SecurityLevel::NetworkTrustedRestricted,
-            "NetworkLocal" => SecurityLevel::NetworkLocal,
-            "Local" => SecurityLevel::Local,
-            "LocalMaxSecurity" => SecurityLevel::LocalMaxSecurity,
-            _ => {
-                return Err(format!(
-                    "Invalid value for min_security_level: {}",
-                    min_security_level_str
-                ))
-            }
-        };
-
-        let name = table
-            .get("name")
-            .ok_or_else(|| "Missing name field".to_string())?
-            .as_str()
-            .ok_or_else(|| "Invalid format for name".to_string())?;
+        let target_copies: u32 = table.try_read("target_copies")?;
+        let target_locations: u32 = table.try_read("target_locations")?;
+        let min_security_level_str: &str = table.try_read("min_security_level")?;
+        let min_security_level = SecurityLevel::from_str(min_security_level_str)?;
+        let name: &str = table.try_read("name")?;
 
         Ok(BackupRequirementClass::new(
             target_copies,
@@ -364,7 +328,7 @@ mod tests {
             },
         },
         models::{
-            backup_requirement::{BackupRequirementClass, SecurityLevel},
+            backup_requirement::SecurityLevel,
             project::{Project, ProjectTrackingStatus},
             secondary_device::DeviceFactory,
         },

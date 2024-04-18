@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 pub enum SecurityLevel {
     // Connected to network, no authorization required
     NetworkPublic,       // referenced, accessible to anyone
@@ -13,6 +15,23 @@ pub enum SecurityLevel {
     // Disconnected from network
     Local,            // local location
     LocalMaxSecurity, // local location with maximum security (in a safe?)
+}
+
+impl FromStr for SecurityLevel {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "NetworkPublic" => Ok(SecurityLevel::NetworkPublic),
+            "NetworkUnreferenced" => Ok(SecurityLevel::NetworkUnreferenced),
+            "NetworkUntrustedRestricted" => Ok(SecurityLevel::NetworkUntrustedRestricted),
+            "NetworkTrustedRestricted" => Ok(SecurityLevel::NetworkTrustedRestricted),
+            "NetworkLocal" => Ok(SecurityLevel::NetworkLocal),
+            "Local" => Ok(SecurityLevel::Local),
+            "LocalMaxSecurity" => Ok(SecurityLevel::LocalMaxSecurity),
+            _ => Err(format!("Invalid SecurityLevel: {}", s)),
+        }
+    }
 }
 
 pub struct BackupRequirementClass {
