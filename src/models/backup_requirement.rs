@@ -29,6 +29,24 @@ pub struct BackupRequirementClass {
     name: String,
 }
 
+impl BackupRequirementClass {
+    pub fn get_target_copies(&self) -> u32 {
+        self.target_copies
+    }
+
+    pub fn get_target_locations(&self) -> u32 {
+        self.target_locations
+    }
+
+    pub fn get_min_security_level(&self) -> &SecurityLevel {
+        &self.min_security_level
+    }
+
+    pub fn get_name(&self) -> &String {
+        &self.name
+    }
+}
+
 impl Default for BackupRequirementClass {
     fn default() -> Self {
         BackupRequirementClass {

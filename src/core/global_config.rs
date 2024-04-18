@@ -3,7 +3,11 @@ use toml::Table;
 
 use crate::{
     adapters::primary_device::GlobalConfigProvider,
-    models::{project::Project, secondary_device::Device},
+    models::{
+        backup_requirement::{BackupRequirementClass, SecurityLevel},
+        project::{Project, ProjectTrackingStatus},
+        secondary_device::Device,
+    },
 };
 
 use super::device_factories_registry::DeviceFactoryRegistry;
@@ -174,7 +178,28 @@ impl GlobalConfig {
             .as_str()
             .ok_or_else(|| "Invalid string for path".to_string())?;
 
-        Ok(Project::new(name.to_string(), path.to_string(), None))
+        let tracking_status = project_table
+            .get("tracking_status")
+            .ok_or_else(|| "No tracking status saved".to_string())?
+            .as_str()
+            .ok_or_else(|| "Invalid string for tracking_status".to_string())?;
+
+        let tracking_status = match tracking_status {
+            "TrackedProject" => Ok(ProjectTrackingStatus::TrackedProject {
+                backup_requirement_class: BackupRequirementClass::default(),
+                last_update: None,
+                current_copies: vec![],
+            }),
+            "UntrackedProject" => Ok(ProjectTrackingStatus::UntrackedProject),
+            "IgnoredProject" => Ok(ProjectTrackingStatus::IgnoredProject),
+            _ => Err("Unknown tracking status".to_string()),
+        }?;
+
+        Ok(Project::new(
+            name.to_string(),
+            path.to_string(),
+            Some(tracking_status),
+        ))
     }
 
     fn assert_no_errors_in_devices(errors: &Vec<String>) -> Result<(), String> {
@@ -281,6 +306,8 @@ mod tests {
                 MockDeviceWithParametersFactory, MockGlobalConfigProviderFactory,
             },
         },
+        models::backup_requirement::{BackupRequirementClass, SecurityLevel},
+        models::project::ProjectTrackingStatus,
         models::secondary_device::DeviceFactory,
     };
 
@@ -863,5 +890,142 @@ type = "MockDeviceWithParameters"
         let result = global_config.remove_device("NonExistantDevice");
         assert!(result.is_err());
         assert_eq!(result.err().unwrap(), "Device not found");
+    }
+
+    #[test]
+    fn when_loading_projects_they_should_have_a_tracking_status_by_default() {
+        let device_factories_registry = get_mock_device_factory_registry();
+        let config_provider = MockGlobalConfigProviderFactory::new(
+            r#"
+    [[projects]]
+    name = "MyProjectInOnePath"
+    path = "/path"
+    "#,
+        );
+        let config = GlobalConfig::load(&config_provider, &device_factories_registry).unwrap();
+        assert!(matches!(
+            config.projects[0].get_tracking_status(),
+            ProjectTrackingStatus::TrackedProject { .. }
+        ));
+    }
+
+    #[test]
+    fn when_loading_project_they_should_have_correct_default_fields_for_tracking_status() {
+        let device_factories_registry = get_mock_device_factory_registry();
+        let config_provider = MockGlobalConfigProviderFactory::new(
+            r#"
+    [[projects]]
+    name = "MyProjectInOnePath"
+    path = "/path"
+    "#,
+        );
+        let config = GlobalConfig::load(&config_provider, &device_factories_registry).unwrap();
+        let tracking_status = config.projects[0].get_tracking_status();
+        let backup_requirement = tracking_status.get_backup_requirement_class().unwrap();
+        assert_eq!(backup_requirement.get_name(), "Default");
+        assert_eq!(backup_requirement.get_target_copies(), 3);
+        assert_eq!(backup_requirement.get_target_locations(), 2);
+        assert!(matches!(
+            backup_requirement.get_min_security_level(),
+            SecurityLevel::NetworkUntrustedRestricted
+        ));
+    }
+
+    #[test]
+    fn when_loading_with_untracked_backup_class_config_it_should_reflect_in_the_project() {
+        let device_factories_registry = get_mock_device_factory_registry();
+        let config_provider = MockGlobalConfigProviderFactory::new(
+            r#"
+    [[projects]]
+    name = "MyProjectInOnePath"
+    path = "/path"
+    tracking_status = "UntrackedProject"
+    "#,
+        );
+        let config = GlobalConfig::load(&config_provider, &device_factories_registry).unwrap();
+        assert!(matches!(
+            config.projects[0].get_tracking_status(),
+            ProjectTrackingStatus::UntrackedProject
+        ));
+    }
+
+    #[test]
+    fn when_loading_with_ignored_backup_class_config_it_should_reflect_in_the_project() {
+        let device_factories_registry = get_mock_device_factory_registry();
+        let config_provider = MockGlobalConfigProviderFactory::new(
+            r#"
+    [[projects]]
+    name = "MyProjectInOnePath"
+    path = "/path"
+    tracking_status = "IgnoredProject"
+    "#,
+        );
+        let config = GlobalConfig::load(&config_provider, &device_factories_registry).unwrap();
+        assert!(matches!(
+            config.projects[0].get_tracking_status(),
+            ProjectTrackingStatus::IgnoredProject
+        ));
+    }
+
+    #[test]
+    fn when_loading_with_unspeciefied_tracking_class_it_should_throw_an_error() {
+        let device_factories_registry = get_mock_device_factory_registry();
+        let config_provider = MockGlobalConfigProviderFactory::new(
+            r#"
+    [[projects]]
+    name = "MyProjectInOnePath"
+    path = "/path"
+    "#,
+        );
+        let config = GlobalConfig::load(&config_provider, &device_factories_registry);
+        assert!(config.is_err());
+        assert_eq!(config.err().unwrap(), "No tracking status saved");
+    }
+
+    #[test]
+    fn when_loading_with_unknown_tracking_class_it_should_throw_an_error() {
+        let device_factories_registry = get_mock_device_factory_registry();
+        let config_provider = MockGlobalConfigProviderFactory::new(
+            r#"
+    [[projects]]
+    name = "MyProjectInOnePath"
+    path = "/path"
+    tracking_status = "UnknownTrackingStatus"
+    "#,
+        );
+        let config = GlobalConfig::load(&config_provider, &device_factories_registry);
+        assert!(config.is_err());
+        assert_eq!(config.err().unwrap(), "Unknown tracking status");
+    }
+
+    #[test]
+    fn when_loading_with_tracked_backup_class_config_it_should_reflect_in_the_project_tracking_config(
+    ) {
+        let device_factories_registry = get_mock_device_factory_registry();
+        let config_provider = MockGlobalConfigProviderFactory::new(
+            r#"
+    [[projects]]
+    name = "MyProjectInOnePath"
+    path = "/path"
+
+    [[projects.tracking_status]]
+    last_update = ""
+    current_copies = []
+
+    [[projects.tracking_status.backup_requirement_class]]
+    target_copies = "1" 
+    target_locations = "1"
+    min_security_level = "NetworkUntrustedRestricted"
+    name = ""
+    "#,
+        );
+        let config = GlobalConfig::load(&config_provider, &device_factories_registry).unwrap();
+        assert!(matches!(
+            config.projects[0].get_tracking_status(),
+            ProjectTrackingStatus::TrackedProject { .. }
+        ));
+        let tracking_status = config.projects[0].get_tracking_status();
+        assert_eq!(tracking_status.get_current_copies().unwrap().len(), 0);
+        assert_eq!(tracking_status.get_last_update(), None);
     }
 }
