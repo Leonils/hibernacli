@@ -1,3 +1,5 @@
+use std::borrow::Borrow;
+
 use itertools::Itertools;
 use toml::{Table, Value};
 
@@ -136,9 +138,7 @@ impl GlobalConfig {
         errors.extend(project_errors);
 
         Self::assert_no_errors_in_config(&errors)?;
-
         Self::assert_no_duplicate_device(&devices)?;
-
         Self::assert_no_duplicate_project_name(&projects)?;
         Self::assert_no_duplicate_project_path(&projects)?;
 
@@ -229,74 +229,50 @@ impl GlobalConfig {
     }
 
     fn assert_no_duplicate_device(devices: &Vec<Box<dyn Device>>) -> Result<(), String> {
-        let device_count_by_name = devices
+        let device_names = devices
             .iter()
             .map(|device| device.get_name())
-            .fold(std::collections::HashMap::new(), |mut acc, name| {
-                *acc.entry(name).or_insert(0) += 1;
-                acc
-            })
-            .into_iter()
-            .filter(|(_, count)| *count > 1)
-            .sorted_by(|(name1, _), (name2, _)| name1.cmp(name2))
-            .collect::<Vec<_>>();
+            .collect::<Vec<String>>();
 
-        if !device_count_by_name.is_empty() {
-            return Err(format!(
-                "Duplicate device found in configuration file: {}",
-                device_count_by_name.iter().map(|(name, _)| name).join(", ")
-            ));
-        }
-
-        Ok(())
+        Self::assert_no_duplicate(
+            device_names.iter(),
+            "Duplicate device found in configuration file",
+        )
     }
 
     fn assert_no_duplicate_project_name(projects: &Vec<Project>) -> Result<(), String> {
-        let project_count_by_name = projects
-            .iter()
-            .map(|project| project.get_name())
-            .fold(std::collections::HashMap::new(), |mut acc, name| {
-                *acc.entry(name).or_insert(0) += 1;
-                acc
-            })
-            .into_iter()
-            .filter(|(_, count)| *count > 1)
-            .sorted_by(|(name1, _), (name2, _)| name1.cmp(name2))
-            .collect::<Vec<_>>();
-
-        if !project_count_by_name.is_empty() {
-            return Err(format!(
-                "Duplicated name found in configuration file for project : {}",
-                project_count_by_name
-                    .iter()
-                    .map(|(name, _)| name)
-                    .join(", ")
-            ));
-        }
-
-        Ok(())
+        Self::assert_no_duplicate(
+            projects.iter().map(|project| project.get_name()),
+            "Duplicated name found in configuration file for project",
+        )
     }
 
     fn assert_no_duplicate_project_path(projects: &Vec<Project>) -> Result<(), String> {
-        let project_count_by_path = projects
-            .iter()
-            .map(|project| project.get_location())
-            .fold(std::collections::HashMap::new(), |mut acc, path| {
-                *acc.entry(path).or_insert(0) += 1;
+        Self::assert_no_duplicate(
+            projects.iter().map(|project| project.get_location()),
+            "Duplicated path found in configuration file for project at",
+        )
+    }
+
+    fn assert_no_duplicate<'a>(
+        keys: impl Iterator<Item = &'a String>,
+        error_introduction_if_duplicate: &str,
+    ) -> Result<(), String> {
+        let duplicate_keys = keys
+            .fold(std::collections::HashMap::new(), |mut acc, key| {
+                *acc.entry(key).or_insert(0) += 1;
                 acc
             })
             .into_iter()
             .filter(|(_, count)| *count > 1)
-            .sorted_by(|(path1, _), (path2, _)| path1.cmp(path2))
+            .sorted_by(|(key1, _), (key2, _)| key1.cmp(key2))
             .collect::<Vec<_>>();
 
-        if !project_count_by_path.is_empty() {
+        if !duplicate_keys.is_empty() {
             return Err(format!(
-                "Duplicated path found in configuration file for project at : {}",
-                project_count_by_path
-                    .iter()
-                    .map(|(path, _)| path)
-                    .join(", ")
+                "{}: {}",
+                error_introduction_if_duplicate,
+                duplicate_keys.iter().map(|(key, _)| key).join(", ")
             ));
         }
 
@@ -800,7 +776,7 @@ mod tests {
         assert!(config.is_err());
         assert_eq!(
             config.err().unwrap(),
-            "Duplicated name found in configuration file for project : MyProject"
+            "Duplicated name found in configuration file for project: MyProject"
         );
     }
 
@@ -824,7 +800,7 @@ mod tests {
         assert!(config.is_err());
         assert_eq!(
             config.err().unwrap(),
-            "Duplicated path found in configuration file for project at : /path"
+            "Duplicated path found in configuration file for project at: /path"
         );
     }
 
