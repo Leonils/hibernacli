@@ -108,6 +108,7 @@ impl<'a, T: UserInterface, U: DeviceOperations, V: ProjectOperations> CommandRun
         self.display_message(message);
         self.read_string()
             .map_err(|_| self.ask_for_string(message))
+            .map(|s| s.trim().to_string())
             .unwrap()
     }
 
@@ -116,6 +117,7 @@ impl<'a, T: UserInterface, U: DeviceOperations, V: ProjectOperations> CommandRun
         self.display_message("Enter a valid Unix path");
         self.read_string()
             .map_err(|_| self.ask_for_unix_path(message))
+            .map(|s| s.trim().to_string())
             .unwrap()
     }
 
