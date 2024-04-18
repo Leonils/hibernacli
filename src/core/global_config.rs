@@ -273,14 +273,11 @@ impl GlobalConfig {
         match tracking_status_table.get("type") {
             Some(Value::String(status_str)) => match status_str.as_str() {
                 "TrackedProject" => {
-                    let backup_requirement_class_table = tracking_status_table
-                        .get("backup_requirement_class")
-                        .ok_or_else(|| "Missing backup_requirement_class section".to_string())?
-                        .as_table()
-                        .ok_or_else(|| "Invalid format for backup_requirement_class".to_string())?;
+                    let backup_requirement_class_table: Table =
+                        tracking_status_table.try_read("backup_requirement_class")?;
 
                     let backup_requirement_class =
-                        Self::decode_backup_requirement_class(backup_requirement_class_table)?;
+                        Self::decode_backup_requirement_class(&backup_requirement_class_table)?;
 
                     Ok(ProjectTrackingStatus::TrackedProject {
                         backup_requirement_class,
@@ -1081,7 +1078,7 @@ type = "MockDeviceWithParameters"
         assert!(config.is_err());
         assert_eq!(
             config.err().unwrap(),
-            "Errors while reading projects from config: Missing backup_requirement_class section"
+            "Errors while reading projects from config: Missing 'backup_requirement_class' section"
         );
     }
 
