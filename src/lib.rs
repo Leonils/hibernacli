@@ -41,3 +41,5 @@ mod devices {
 }
 
 pub mod cli;
+
+pub mod macros;

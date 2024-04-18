@@ -189,14 +189,7 @@ impl GlobalConfig {
     fn load_project_from_toml_bloc(project_table: &Table) -> Result<Project, String> {
         let name: &str = project_table.try_read("name")?;
         let path: &str = project_table.try_read("path")?;
-
-        let tracking_status_table = project_table
-            .get("tracking_status")
-            .ok_or_else(|| "No tracking status saved".to_string())?
-            .as_table()
-            .ok_or_else(|| "Invalid string for tracking_status".to_string())?;
-
-        let tracking_status = Self::decode_tracking_status(tracking_status_table)?;
+        let tracking_status = project_table.try_read("tracking_status")?;
 
         Ok(Project::new(
             name.to_string(),
@@ -265,29 +258,6 @@ impl GlobalConfig {
         }
 
         Ok(())
-    }
-
-    fn decode_tracking_status(
-        tracking_status_table: &Table,
-    ) -> Result<ProjectTrackingStatus, String> {
-        match tracking_status_table.get("type") {
-            Some(Value::String(status_str)) => match status_str.as_str() {
-                "TrackedProject" => {
-                    let backup_requirement_class =
-                        tracking_status_table.try_read("backup_requirement_class")?;
-
-                    Ok(ProjectTrackingStatus::TrackedProject {
-                        backup_requirement_class,
-                        last_update: None, // Handle last_update if present in your TOML
-                        current_copies: vec![], // Handle current_copies if present in your TOML
-                    })
-                }
-                "UntrackedProject" => Ok(ProjectTrackingStatus::UntrackedProject),
-                "IgnoredProject" => Ok(ProjectTrackingStatus::IgnoredProject),
-                _ => Err("Unknown tracking status type".to_string()),
-            },
-            _ => Err("Missing tracking status type".to_string()),
-        }
     }
 }
 
