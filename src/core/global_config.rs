@@ -92,18 +92,22 @@ impl GlobalConfig {
             .into_iter()
             .partition_map(From::from);
 
-        let projects = toml::from_str::<PartiallyParsedProjectGlobalConfig>(&config_toml)
-            .map_err(|e| e.to_string())?
-            .projects
-            .unwrap_or(vec![])
-            .into_iter()
-            .map(|project_table| -> Result<Project, String> {
-                Self::load_project_from_toml_bloc(project_table)
-            })
-            .collect::<Result<Vec<_>, _>>()?;
+        let (project_errors, projects): (Vec<String>, Vec<Project>) =
+            toml::from_str::<PartiallyParsedProjectGlobalConfig>(&config_toml)
+                .map_err(|e| e.to_string())?
+                .projects
+                .unwrap_or(vec![])
+                .into_iter()
+                .map(|project_table| -> Result<Project, String> {
+                    Self::load_project_from_toml_bloc(project_table)
+                })
+                .into_iter()
+                .partition_map(From::from);
 
         Self::assert_no_errors_in_devices(&errors)?;
         Self::assert_no_duplicate_device(&devices)?;
+
+        Self::assert_no_errors_in_projects(&project_errors)?;
 
         Ok(GlobalConfig { devices, projects })
     }
@@ -199,6 +203,13 @@ impl GlobalConfig {
             ));
         }
 
+        Ok(())
+    }
+
+    fn assert_no_errors_in_projects(errors: &Vec<String>) -> Result<(), String> {
+        if !errors.is_empty() {
+            return Err(errors.join(", "));
+        }
         Ok(())
     }
 }
@@ -363,6 +374,7 @@ mod tests {
         assert_eq!(config.projects[0].get_name(), "ergergerger");
         assert_eq!(config.projects[0].get_location(), "/tmp");
     }
+
     #[test]
     fn when_retrieving_config_with_random_path_it_shall_be_reflected_in_project() {
         let device_factories_registry = get_mock_device_factory_registry();
@@ -402,6 +414,28 @@ mod tests {
     }
 
     #[test]
+    fn when_retrieving_config_with_multiple_projects_it_shall_have_all_projects_in_global_config() {
+        let device_factories_registry = get_mock_device_factory_registry();
+        let config_provider = MockGlobalConfigProviderFactory::new(
+            r#"
+    [[projects]]
+    name = "MyProject"
+    path = "/tmp"
+
+    [[projects]]
+    name = "MySecondProject"
+    path = "/root"
+    "#,
+        );
+        let config = GlobalConfig::load(&config_provider, &device_factories_registry).unwrap();
+        assert_eq!(config.projects.len(), 2);
+        assert_eq!(config.projects[0].get_name(), "MyProject");
+        assert_eq!(config.projects[0].get_location(), "/tmp");
+        assert_eq!(config.projects[1].get_name(), "MySecondProject");
+        assert_eq!(config.projects[1].get_location(), "/root");
+    }
+
+    #[test]
     fn if_type_is_not_in_registry_it_shall_return_error() {
         let device_factories_registry = get_mock_device_factory_registry();
         let config_provider = MockGlobalConfigProviderFactory::new(
@@ -431,6 +465,34 @@ mod tests {
     }
 
     #[test]
+    fn if_name_is_missing_in_project_it_should_fail() {
+        let device_factories_registry = get_mock_device_factory_registry();
+        let config_provider = MockGlobalConfigProviderFactory::new(
+            r#"
+    [[projects]]
+    path = "/tmp"
+    "#,
+        );
+        let config = GlobalConfig::load(&config_provider, &device_factories_registry);
+        assert!(config.is_err());
+        assert_eq!(config.err().unwrap(), "Missing name for project");
+    }
+
+    #[test]
+    fn if_path_is_missing_in_project_it_should_fail() {
+        let device_factories_registry = get_mock_device_factory_registry();
+        let config_provider = MockGlobalConfigProviderFactory::new(
+            r#"
+    [[projects]]
+    name = "MyProject"
+    "#,
+        );
+        let config = GlobalConfig::load(&config_provider, &device_factories_registry);
+        assert!(config.is_err());
+        assert_eq!(config.err().unwrap(), "Missing path for project");
+    }
+
+    #[test]
     fn if_multiple_errors_in_device_it_shall_return_first_error_of_each_device() {
         let device_factories_registry = get_mock_device_factory_registry();
         let config_provider = MockGlobalConfigProviderFactory::new(
@@ -448,6 +510,26 @@ mod tests {
         assert_eq!(
             config.err().unwrap(),
             "Missing name for device, Device factory not found"
+        );
+    }
+
+    #[test]
+    fn if_multiple_errors_in_projects_it_shall_return_first_error_of_each_project() {
+        let device_factories_registry = get_mock_device_factory_registry();
+        let config_provider = MockGlobalConfigProviderFactory::new(
+            r#"
+    [[projects]]
+    name = "MyProject"
+
+    [[projects]]
+    path = "/tmp"
+    "#,
+        );
+        let config = GlobalConfig::load(&config_provider, &device_factories_registry);
+        assert!(config.is_err());
+        assert_eq!(
+            config.err().unwrap(),
+            "Missing path for project, Missing name for project"
         );
     }
 
