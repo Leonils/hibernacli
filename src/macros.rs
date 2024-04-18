@@ -17,3 +17,19 @@ macro_rules! extract_enum_value {
         }
     };
 }
+
+#[macro_export]
+#[cfg(test)]
+macro_rules! now {
+    () => {
+        SystemTime::UNIX_EPOCH
+    };
+}
+
+#[macro_export]
+#[cfg(not(test))]
+macro_rules! now {
+    () => {
+        SystemTime::now()
+    };
+}
