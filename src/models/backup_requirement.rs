@@ -30,6 +30,20 @@ pub struct BackupRequirementClass {
 }
 
 impl BackupRequirementClass {
+    pub fn new(
+        target_copies: u32,
+        target_locations: u32,
+        min_security_level: SecurityLevel,
+        name: String,
+    ) -> BackupRequirementClass {
+        BackupRequirementClass {
+            target_copies,
+            target_locations,
+            min_security_level,
+            name,
+        }
+    }
+
     pub fn get_target_copies(&self) -> u32 {
         self.target_copies
     }

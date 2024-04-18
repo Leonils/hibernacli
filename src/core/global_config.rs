@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use toml::Table;
+use toml::{Table, Value};
 
 use crate::{
     adapters::primary_device::GlobalConfigProvider,
@@ -178,22 +178,13 @@ impl GlobalConfig {
             .as_str()
             .ok_or_else(|| "Invalid string for path".to_string())?;
 
-        let tracking_status = project_table
+        let tracking_status_table = project_table
             .get("tracking_status")
             .ok_or_else(|| "No tracking status saved".to_string())?
-            .as_str()
+            .as_table()
             .ok_or_else(|| "Invalid string for tracking_status".to_string())?;
 
-        let tracking_status = match tracking_status {
-            "TrackedProject" => Ok(ProjectTrackingStatus::TrackedProject {
-                backup_requirement_class: BackupRequirementClass::default(),
-                last_update: None,
-                current_copies: vec![],
-            }),
-            "UntrackedProject" => Ok(ProjectTrackingStatus::UntrackedProject),
-            "IgnoredProject" => Ok(ProjectTrackingStatus::IgnoredProject),
-            _ => Err("Unknown tracking status".to_string()),
-        }?;
+        let tracking_status = Self::decode_tracking_status(tracking_status_table)?;
 
         Ok(Project::new(
             name.to_string(),
@@ -291,6 +282,86 @@ impl GlobalConfig {
 
         Ok(())
     }
+
+    fn decode_tracking_status(
+        tracking_status_table: &Table,
+    ) -> Result<ProjectTrackingStatus, String> {
+        match tracking_status_table.get("type") {
+            Some(Value::String(status_str)) => match status_str.as_str() {
+                "TrackedProject" => {
+                    let backup_requirement_class_table = tracking_status_table
+                        .get("backup_requirement_class")
+                        .ok_or_else(|| "Missing backup_requirement_class section".to_string())?
+                        .as_table()
+                        .ok_or_else(|| "Invalid format for backup_requirement_class".to_string())?;
+
+                    let backup_requirement_class =
+                        Self::decode_backup_requirement_class(backup_requirement_class_table)?;
+
+                    Ok(ProjectTrackingStatus::TrackedProject {
+                        backup_requirement_class,
+                        last_update: None, // Handle last_update if present in your TOML
+                        current_copies: vec![], // Handle current_copies if present in your TOML
+                    })
+                }
+                "UntrackedProject" => Ok(ProjectTrackingStatus::UntrackedProject),
+                "IgnoredProject" => Ok(ProjectTrackingStatus::IgnoredProject),
+                _ => Err("Unknown tracking status type".to_string()),
+            },
+            _ => Err("Missing tracking status type".to_string()),
+        }
+    }
+
+    fn decode_backup_requirement_class(table: &Table) -> Result<BackupRequirementClass, String> {
+        let target_copies = table
+            .get("target_copies")
+            .ok_or_else(|| "Missing target_copies field".to_string())?
+            .as_integer()
+            .ok_or_else(|| "Invalid format for target_copies".to_string())?
+            as u32;
+
+        let target_locations = table
+            .get("target_locations")
+            .ok_or_else(|| "Missing target_locations field".to_string())?
+            .as_integer()
+            .ok_or_else(|| "Invalid format for target_locations".to_string())?
+            as u32;
+
+        let min_security_level_str = table
+            .get("min_security_level")
+            .ok_or_else(|| "Missing min_security_level field".to_string())?
+            .as_str()
+            .ok_or_else(|| "Invalid format for min_security_level".to_string())?;
+
+        let min_security_level = match min_security_level_str {
+            "NetworkPublic" => SecurityLevel::NetworkPublic,
+            "NetworkUnreferenced" => SecurityLevel::NetworkUnreferenced,
+            "NetworkUntrustedRestricted" => SecurityLevel::NetworkUntrustedRestricted,
+            "NetworkTrustedRestricted" => SecurityLevel::NetworkTrustedRestricted,
+            "NetworkLocal" => SecurityLevel::NetworkLocal,
+            "Local" => SecurityLevel::Local,
+            "LocalMaxSecurity" => SecurityLevel::LocalMaxSecurity,
+            _ => {
+                return Err(format!(
+                    "Invalid value for min_security_level: {}",
+                    min_security_level_str
+                ))
+            }
+        };
+
+        let name = table
+            .get("name")
+            .ok_or_else(|| "Missing name field".to_string())?
+            .as_str()
+            .ok_or_else(|| "Invalid format for name".to_string())?;
+
+        Ok(BackupRequirementClass::new(
+            target_copies,
+            target_locations,
+            min_security_level,
+            name.to_string(),
+        ))
+    }
 }
 
 #[cfg(test)]
@@ -384,7 +455,7 @@ mod tests {
     [[projects]]
     name = "MyProject"
     path = "/tmp"
-    tracking_status = "IgnoredProject"
+    tracking_status = { type = "IgnoredProject" }
     "#,
         );
         let config = GlobalConfig::load(&config_provider, &device_factories_registry).unwrap();
@@ -399,12 +470,12 @@ mod tests {
     [[projects]]
     name = "MyProject"
     path = "/tmp"
-    tracking_status = "IgnoredProject"
+    tracking_status = { type = "IgnoredProject" }
 
         [[projects]]
     name = "MySecondAwesomeProject"
     path = "/root"
-    tracking_status = "IgnoredProject"
+    tracking_status = { type = "IgnoredProject" }
     "#,
         );
         let config = GlobalConfig::load(&config_provider, &device_factories_registry).unwrap();
@@ -435,7 +506,7 @@ mod tests {
     [[projects]]
     name = "MyProject"
     path = "/tmp"
-    tracking_status = "IgnoredProject"
+    tracking_status = { type = "IgnoredProject" }
     "#,
         );
         let config = GlobalConfig::load(&config_provider, &device_factories_registry).unwrap();
@@ -452,7 +523,7 @@ mod tests {
     [[projects]]
     name = "ergergerger"
     path = "/tmp"
-    tracking_status = "IgnoredProject"
+    tracking_status = { type = "IgnoredProject" }
     "#,
         );
         let config = GlobalConfig::load(&config_provider, &device_factories_registry).unwrap();
@@ -469,7 +540,7 @@ mod tests {
     [[projects]]
     name = "MyProject"
     path = "/gerger/gerg/zfer/zgze"
-    tracking_status = "IgnoredProject"
+    tracking_status = { type = "IgnoredProject" }
     "#,
         );
         let config = GlobalConfig::load(&config_provider, &device_factories_registry).unwrap();
@@ -508,12 +579,12 @@ mod tests {
     [[projects]]
     name = "MyProject"
     path = "/tmp"
-    tracking_status = "IgnoredProject"
+    tracking_status = { type = "IgnoredProject" }
 
     [[projects]]
     name = "MySecondProject"
     path = "/root"
-    tracking_status = "IgnoredProject"
+    tracking_status = { type = "IgnoredProject" }
     "#,
         );
         let config = GlobalConfig::load(&config_provider, &device_factories_registry).unwrap();
@@ -693,12 +764,12 @@ mod tests {
     [[projects]]
     name = "MyProject"
     path = "/firstPath"
-    tracking_status = "IgnoredProject"
+    tracking_status = { type = "IgnoredProject" }
 
     [[projects]]
     name = "MyProject"
     path = "/secondPath"
-    tracking_status = "IgnoredProject"
+    tracking_status = { type = "IgnoredProject" }
     "#,
         );
         let config = GlobalConfig::load(&config_provider, &device_factories_registry);
@@ -717,12 +788,12 @@ mod tests {
     [[projects]]
     name = "MyProjectInOnePath"
     path = "/path"
-    tracking_status = "IgnoredProject"
+    tracking_status = { type = "IgnoredProject" }
 
     [[projects]]
     name = "MyProjectInAnotherPath"
     path = "/path"
-    tracking_status = "IgnoredProject"
+    tracking_status = { type = "IgnoredProject" }
     "#,
         );
         let config = GlobalConfig::load(&config_provider, &device_factories_registry);
@@ -912,7 +983,7 @@ type = "MockDeviceWithParameters"
     [[projects]]
     name = "MyProjectInOnePath"
     path = "/path"
-    tracking_status = "UntrackedProject"
+    tracking_status = { type = "UntrackedProject"}
     "#,
         );
         let config = GlobalConfig::load(&config_provider, &device_factories_registry).unwrap();
@@ -930,7 +1001,7 @@ type = "MockDeviceWithParameters"
     [[projects]]
     name = "MyProjectInOnePath"
     path = "/path"
-    tracking_status = "IgnoredProject"
+    tracking_status = { type = "IgnoredProject" }
     "#,
         );
         let config = GlobalConfig::load(&config_provider, &device_factories_registry).unwrap();
@@ -963,15 +1034,15 @@ type = "MockDeviceWithParameters"
     [[projects]]
     name = "MyProjectInOnePath"
     path = "/path"
-    tracking_status = "UnknownTrackingStatus"
+    tracking_status = { type = "UnknownTrackingStatus" }
     "#,
         );
         let config = GlobalConfig::load(&config_provider, &device_factories_registry);
         assert!(config.is_err());
-        assert_eq!(config.err().unwrap(), "Unknown tracking status");
+        assert_eq!(config.err().unwrap(), "Unknown tracking status type");
     }
 
-    // #[test]
+    #[test]
     fn when_loading_with_tracked_backup_class_config_it_should_reflect_in_the_project_tracking_config(
     ) {
         let device_factories_registry = get_mock_device_factory_registry();
@@ -980,17 +1051,8 @@ type = "MockDeviceWithParameters"
     [[projects]]
     name = "MyProjectInOnePath"
     path = "/path"
-    tracking_status = "TrackedProject"
+    tracking_status = { type = "TrackedProject", backup_requirement_class = {target_copies = 3, target_locations = 2, min_security_level = "NetworkUntrustedRestricted", name = "Critical Data"}, last_update = "2024-04-18T15:22:00Z", current_copies = [] }
 
-    [[projects.tracking_status]]
-    last_update = ""
-    current_copies = []
-
-    [[projects.tracking_status.backup_requirement_class]]
-    target_copies = "1" 
-    target_locations = "1"
-    min_security_level = "NetworkUntrustedRestricted"
-    name = ""
     "#,
         );
         let config = GlobalConfig::load(&config_provider, &device_factories_registry).unwrap();
@@ -1001,5 +1063,52 @@ type = "MockDeviceWithParameters"
         let tracking_status = config.projects[0].get_tracking_status();
         assert_eq!(tracking_status.get_current_copies().unwrap().len(), 0);
         assert_eq!(tracking_status.get_last_update(), None);
+        assert_eq!(
+            tracking_status
+                .get_backup_requirement_class()
+                .unwrap()
+                .get_name(),
+            "Critical Data"
+        );
+        assert_eq!(
+            tracking_status
+                .get_backup_requirement_class()
+                .unwrap()
+                .get_target_copies(),
+            3
+        );
+        assert_eq!(
+            tracking_status
+                .get_backup_requirement_class()
+                .unwrap()
+                .get_target_locations(),
+            2
+        );
+        assert!(matches!(
+            tracking_status
+                .get_backup_requirement_class()
+                .unwrap()
+                .get_min_security_level(),
+            SecurityLevel::NetworkUntrustedRestricted
+        ));
+    }
+
+    #[test]
+    fn when_loading_with_tracking_status_if_no_backup_requirement_class_it_should_throw_an_error() {
+        let device_factories_registry = get_mock_device_factory_registry();
+        let config_provider = MockGlobalConfigProviderFactory::new(
+            r#"
+    [[projects]]
+    name = "MyProjectInOnePath"
+    path = "/path"
+    tracking_status = { type = "TrackedProject"}
+    "#,
+        );
+        let config = GlobalConfig::load(&config_provider, &device_factories_registry);
+        assert!(config.is_err());
+        assert_eq!(
+            config.err().unwrap(),
+            "Missing backup_requirement_class section"
+        );
     }
 }
