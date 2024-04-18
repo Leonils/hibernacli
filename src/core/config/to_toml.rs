@@ -9,14 +9,13 @@ struct PartiallyParsedGlobalConfig {
 }
 
 pub trait ToToml {
-    fn to_toml(self) -> Result<String, String>;
+    fn to_toml(&self) -> Result<String, String>;
 }
 
 impl ToToml for GlobalConfig {
-    fn to_toml(self) -> Result<String, String> {
+    fn to_toml(&self) -> Result<String, String> {
         let device_tables = self
-            .get_devices()
-            .iter()
+            .get_devices_iter()
             .map(|device| device.to_toml_table())
             .collect::<Vec<_>>();
 

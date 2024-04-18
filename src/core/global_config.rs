@@ -50,6 +50,10 @@ impl GlobalConfig {
     pub fn get_devices(self) -> Vec<Box<dyn Device>> {
         self.devices
     }
+
+    pub fn get_devices_iter(&self) -> impl Iterator<Item = &Box<dyn Device>> {
+        self.devices.iter()
+    }
 }
 
 impl GlobalConfig {
@@ -129,7 +133,7 @@ impl GlobalConfig {
         Ok(GlobalConfig { devices, projects })
     }
 
-    pub fn save(self, config_provider: &dyn GlobalConfigProvider) -> Result<(), String> {
+    pub fn save(&self, config_provider: &dyn GlobalConfigProvider) -> Result<(), String> {
         let config_toml = self.to_toml()?;
 
         config_provider.write_global_config(&config_toml).unwrap();
