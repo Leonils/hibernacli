@@ -29,16 +29,15 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[cfg_attr(test, automock)]
 pub trait UserInterface {
-    fn write(&self, message: &str) -> Result<(), String>;
+    fn write(&self, message: &str) -> ();
     fn read(&self) -> Result<String, String>;
 }
 
 pub struct Console;
 
 impl UserInterface for Console {
-    fn write(&self, message: &str) -> Result<(), String> {
+    fn write(&self, message: &str) -> () {
         println!("{}", message);
-        Ok(())
     }
     fn read(&self) -> Result<String, String> {
         let mut buffer = String::new();
@@ -254,7 +253,7 @@ mod tests {
             .expect_write()
             .times(1)
             .with(eq(message.clone()))
-            .return_const(Ok(()));
+            .return_const(());
         let device_operations = MockDeviceOperations::new();
         let command_runner = CommandRunner::new(console, &device_operations, &project_operations);
         command_runner.display_message(&message);
@@ -310,7 +309,7 @@ mod tests {
             .expect_write()
             .times(1)
             .with(eq(HELP.to_string()))
-            .return_const(Ok(()));
+            .return_const(());
         let device_operations = MockDeviceOperations::new();
         let command_runner = CommandRunner::new(console, &device_operations, &project_operations);
         command_runner.display_help();
@@ -324,7 +323,7 @@ mod tests {
             .expect_write()
             .times(1)
             .with(eq(HELP.to_string()))
-            .return_const(Ok(()));
+            .return_const(());
         let device_operations = MockDeviceOperations::new();
         let mut command_runner =
             CommandRunner::new(console, &device_operations, &project_operations);
@@ -339,7 +338,7 @@ mod tests {
             .expect_write()
             .times(1)
             .with(eq(INVALID_COMMAND.to_string()))
-            .return_const(Ok(()));
+            .return_const(());
         let device_operations = MockDeviceOperations::new();
         let mut command_runner =
             CommandRunner::new(console, &device_operations, &project_operations);
@@ -357,7 +356,7 @@ mod tests {
             .expect_write()
             .times(1)
             .with(eq(INVALID_COMMAND.to_string()))
-            .return_const(Ok(()));
+            .return_const(());
         let device_operations = MockDeviceOperations::new();
         let mut command_runner =
             CommandRunner::new(console, &device_operations, &project_operations);
@@ -372,7 +371,7 @@ mod tests {
             .expect_write()
             .times(1)
             .with(eq(VERSION.to_string()))
-            .return_const(Ok(()));
+            .return_const(());
         let device_operations = MockDeviceOperations::new();
         let mut command_runner =
             CommandRunner::new(console, &device_operations, &project_operations);
@@ -390,7 +389,7 @@ mod tests {
             .expect_write()
             .times(1)
             .with(eq(VERSION.to_string()))
-            .return_const(Ok(()));
+            .return_const(());
         let device_operations = MockDeviceOperations::new();
         let mut command_runner =
             CommandRunner::new(console, &device_operations, &project_operations);
@@ -416,7 +415,7 @@ mod tests {
             .expect_write()
             .times(2)
             .withf(|msg| msg.contains("USBkey") || msg.contains("Device"))
-            .return_const(Ok(()));
+            .return_const(());
 
         let mut command_runner =
             CommandRunner::new(console, &device_operations, &project_operations);
@@ -435,7 +434,7 @@ mod tests {
             .expect_write()
             .times(1)
             .with(eq(INVALID_COMMAND.to_string()))
-            .return_const(Ok(()));
+            .return_const(());
         let device_operations = MockDeviceOperations::new();
         let mut command_runner =
             CommandRunner::new(console, &device_operations, &project_operations);
@@ -459,7 +458,7 @@ mod tests {
                     || msg.contains("Creating new device of type:")
                     || msg.contains("Device created successfully")
             })
-            .return_const(Ok(()));
+            .return_const(());
         console
             .expect_read()
             .times(1)
@@ -535,7 +534,7 @@ mod tests {
                     || msg.contains("Device created successfully")
                     || msg.contains("Enter a valid Unix path")
             })
-            .return_const(Ok(()));
+            .return_const(());
         console
             .expect_read()
             .times(1)
@@ -605,7 +604,7 @@ mod tests {
             .expect_write()
             .times(1)
             .with(eq("Removed device successfully"))
-            .return_const(Ok(()));
+            .return_const(());
         let mut device_operations = MockDeviceOperations::new();
         device_operations
             .expect_remove_by_name()
@@ -631,7 +630,7 @@ mod tests {
             .expect_write()
             .times(1)
             .with(eq(INVALID_COMMAND.to_string()))
-            .return_const(Ok(()));
+            .return_const(());
         let device_operations = MockDeviceOperations::new();
         let mut command_runner =
             CommandRunner::new(console, &device_operations, &project_operations);
@@ -654,7 +653,7 @@ mod tests {
             .expect_write()
             .times(1)
             .with(eq("Project list:"))
-            .return_const(Ok(()));
+            .return_const(());
         let device_operations = MockDeviceOperations::new();
         let mut command_runner =
             CommandRunner::new(console, &device_operations, &project_operations);
@@ -673,7 +672,7 @@ mod tests {
             .expect_write()
             .times(1)
             .with(eq(INVALID_COMMAND.to_string()))
-            .return_const(Ok(()));
+            .return_const(());
         let device_operations = MockDeviceOperations::new();
         let mut command_runner =
             CommandRunner::new(console, &device_operations, &project_operations);
