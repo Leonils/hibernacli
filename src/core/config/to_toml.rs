@@ -6,7 +6,7 @@ use crate::{
     core::global_config::GlobalConfig,
     models::{
         backup_requirement::BackupRequirementClass,
-        project::{ProjectCopy, ProjectTrackingStatus},
+        project::{Project, ProjectCopy, ProjectTrackingStatus},
     },
 };
 
@@ -18,6 +18,10 @@ struct PartiallyParsedGlobalConfig {
 
 pub trait ToTomlValue {
     fn to_toml_value(&self) -> Result<toml::Value, String>;
+}
+
+pub trait ToTomlTable {
+    fn to_toml_table(&self) -> Result<toml::Table, String>;
 }
 
 pub trait ToToml {
@@ -45,8 +49,8 @@ impl ToToml for GlobalConfig {
     }
 }
 
-impl ToTomlValue for BackupRequirementClass {
-    fn to_toml_value(&self) -> Result<toml::Value, String> {
+impl ToTomlTable for BackupRequirementClass {
+    fn to_toml_table(&self) -> Result<toml::Table, String> {
         let mut table = Table::new();
         table.insert(
             "target_copies".to_string(),
@@ -65,20 +69,20 @@ impl ToTomlValue for BackupRequirementClass {
             toml::Value::String(self.get_name().clone()),
         );
 
-        Ok(toml::Value::Table(table))
+        Ok(table)
     }
 }
 
 impl ToToml for BackupRequirementClass {
     fn to_toml(&self) -> Result<String, String> {
-        let toml_value = self.to_toml_value()?;
+        let toml_value = self.to_toml_table()?;
         let toml = toml_value.to_string();
         Ok(toml)
     }
 }
 
-impl ToTomlValue for ProjectTrackingStatus {
-    fn to_toml_value(&self) -> Result<toml::Value, String> {
+impl ToTomlTable for ProjectTrackingStatus {
+    fn to_toml_table(&self) -> Result<toml::Table, String> {
         let type_name = match self {
             ProjectTrackingStatus::TrackedProject { .. } => "TrackedProject",
             ProjectTrackingStatus::UntrackedProject => "UntrackedProject",
@@ -99,7 +103,7 @@ impl ToTomlValue for ProjectTrackingStatus {
             } => {
                 table.insert(
                     "backup_requirement_class".to_string(),
-                    backup_requirement_class.to_toml_value()?,
+                    toml::Value::Table(backup_requirement_class.to_toml_table()?),
                 );
                 table.insert(
                     "last_update".to_string(),
@@ -121,14 +125,42 @@ impl ToTomlValue for ProjectTrackingStatus {
             _ => {}
         }
 
-        Ok(toml::Value::Table(table))
+        Ok(table)
     }
 }
 
 impl ToToml for ProjectTrackingStatus {
     fn to_toml(&self) -> Result<String, String> {
-        let toml_value = self.to_toml_value()?;
+        let toml_value = self.to_toml_table()?;
         let toml = toml_value.to_string();
+        Ok(toml)
+    }
+}
+
+impl ToTomlTable for Project {
+    fn to_toml_table(&self) -> Result<toml::Table, String> {
+        let mut table = Table::new();
+        table.insert(
+            "name".to_string(),
+            toml::Value::String(self.get_name().clone()),
+        );
+        table.insert(
+            "location".to_string(),
+            toml::Value::String(self.get_location().clone()),
+        );
+        table.insert(
+            "tracking_status".to_string(),
+            toml::Value::Table(self.get_tracking_status().to_toml_table()?),
+        );
+
+        Ok(table)
+    }
+}
+
+impl ToToml for Project {
+    fn to_toml(&self) -> Result<String, String> {
+        let table = self.to_toml_table()?;
+        let toml = toml::to_string(&table).map_err(|e| e.to_string())?;
         Ok(toml)
     }
 }
@@ -196,7 +228,11 @@ type = "MockDeviceWithParameters"
         let toml = backup_requirement_class.to_toml().unwrap();
         assert_eq!(
             toml,
-            r#"{ min_security_level = "NetworkUntrustedRestricted", name = "Default", target_copies = 3, target_locations = 2 }"#
+            r#"min_security_level = "NetworkUntrustedRestricted"
+name = "Default"
+target_copies = 3
+target_locations = 2
+"#
         );
     }
 
@@ -212,7 +248,15 @@ type = "MockDeviceWithParameters"
         let toml = project_tracking_status.to_toml().unwrap();
         assert_eq!(
             toml,
-            r#"{ last_update = "100", type = "TrackedProject", backup_requirement_class = { min_security_level = "NetworkUntrustedRestricted", name = "Default", target_copies = 3, target_locations = 2 } }"#
+            r#"last_update = "100"
+type = "TrackedProject"
+
+[backup_requirement_class]
+min_security_level = "NetworkUntrustedRestricted"
+name = "Default"
+target_copies = 3
+target_locations = 2
+"#
         );
     }
 
@@ -220,13 +264,52 @@ type = "MockDeviceWithParameters"
     fn when_converting_untracked_project_to_toml_it_shall_return_toml() {
         let project_tracking_status = ProjectTrackingStatus::UntrackedProject;
         let toml = project_tracking_status.to_toml().unwrap();
-        assert_eq!(toml, r#"{ type = "UntrackedProject" }"#);
+        assert_eq!(
+            toml,
+            r#"type = "UntrackedProject"
+"#
+        );
     }
 
     #[test]
     fn when_converting_ignored_project_to_toml_it_shall_return_toml() {
         let project_tracking_status = ProjectTrackingStatus::IgnoredProject;
         let toml = project_tracking_status.to_toml().unwrap();
-        assert_eq!(toml, r#"{ type = "IgnoredProject" }"#);
+        assert_eq!(
+            toml,
+            r#"type = "IgnoredProject"
+"#
+        );
+    }
+
+    #[test]
+    fn when_converting_project_to_toml_it_shall_return_toml() {
+        let project = Project::new(
+            "MyProject".to_string(),
+            "MyLocation".to_string(),
+            Some(ProjectTrackingStatus::TrackedProject {
+                last_update: Some(SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(100)),
+                backup_requirement_class: BackupRequirementClass::default(),
+                current_copies: vec![],
+            }),
+        );
+
+        let toml = project.to_toml().unwrap();
+        assert_eq!(
+            toml,
+            r#"location = "MyLocation"
+name = "MyProject"
+
+[tracking_status]
+last_update = "100"
+type = "TrackedProject"
+
+[tracking_status.backup_requirement_class]
+min_security_level = "NetworkUntrustedRestricted"
+name = "Default"
+target_copies = 3
+target_locations = 2
+"#
+        );
     }
 }
