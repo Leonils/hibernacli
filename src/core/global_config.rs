@@ -109,7 +109,7 @@ impl GlobalConfig {
     ) -> Result<GlobalConfig, String> {
         let config_toml = config_provider.read_global_config()?;
 
-        let (errors, devices) = toml::from_str::<PartiallyParsedGlobalConfig>(&config_toml)
+        let (device_errors, devices) = toml::from_str::<PartiallyParsedGlobalConfig>(&config_toml)
             .map_err(|e| e.to_string())?
             .devices
             .unwrap_or(vec![])
@@ -132,10 +132,13 @@ impl GlobalConfig {
                 .into_iter()
                 .partition_map(From::from);
 
-        Self::assert_no_errors_in_devices(&errors)?;
+        let mut errors: Vec<String> = device_errors;
+        errors.extend(project_errors);
+
+        Self::assert_no_errors_in_config(&errors)?;
+
         Self::assert_no_duplicate_device(&devices)?;
 
-        Self::assert_no_errors_in_projects(&project_errors)?;
         Self::assert_no_duplicate_project_name(&projects)?;
         Self::assert_no_duplicate_project_path(&projects)?;
 
@@ -217,7 +220,7 @@ impl GlobalConfig {
         ))
     }
 
-    fn assert_no_errors_in_devices(errors: &Vec<String>) -> Result<(), String> {
+    fn assert_no_errors_in_config(errors: &Vec<String>) -> Result<(), String> {
         if !errors.is_empty() {
             return Err(errors.join(", "));
         }
@@ -245,13 +248,6 @@ impl GlobalConfig {
             ));
         }
 
-        Ok(())
-    }
-
-    fn assert_no_errors_in_projects(errors: &Vec<String>) -> Result<(), String> {
-        if !errors.is_empty() {
-            return Err(errors.join(", "));
-        }
         Ok(())
     }
 
