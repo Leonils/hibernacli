@@ -1,6 +1,8 @@
 use toml::Table;
 
-use crate::core::global_config::GlobalConfig;
+use crate::{
+    core::global_config::GlobalConfig, models::backup_requirement::BackupRequirementClass,
+};
 
 #[derive(serde::Deserialize, serde::Serialize, Debug, Default)]
 struct PartiallyParsedGlobalConfig {
@@ -30,6 +32,12 @@ impl ToToml for GlobalConfig {
         .map_err(|e| e.to_string())?;
 
         Ok(config_toml)
+    }
+}
+
+impl ToToml for BackupRequirementClass {
+    fn to_toml(&self) -> Result<String, String> {
+        toml::to_string(self).map_err(|e| e.to_string())
     }
 }
 
@@ -86,5 +94,19 @@ type = "MockDeviceWithParameters"
         let device2 = MockDeviceWithParameters::new("MyDevice", "MyParameter");
         let global_config = GlobalConfig::new(vec![Box::new(device1), Box::new(device2)], vec![]);
         global_config.save(&config_provider).unwrap();
+    }
+
+    #[test]
+    fn when_converting_backup_requirement_class_to_toml_it_shall_return_toml() {
+        let backup_requirement_class = BackupRequirementClass::default();
+        let toml = backup_requirement_class.to_toml().unwrap();
+        assert_eq!(
+            toml,
+            r#"target_copies = 3
+target_locations = 2
+min_security_level = "NetworkUntrustedRestricted"
+name = "Default"
+"#
+        );
     }
 }
