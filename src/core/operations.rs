@@ -34,7 +34,7 @@ impl Operations {
         &mut self,
         device_factory_key: String,
         device_factory_readable_name: String,
-        device_factory: Rc<dyn DeviceFactory>,
+        device_factory: impl Fn() -> Box<dyn DeviceFactory> + 'static,
     ) {
         self.device_factory_registry.register_device(
             device_factory_key,
@@ -49,7 +49,7 @@ impl DeviceOperations for Operations {
         self.device_factory_registry.list_factories()
     }
 
-    fn get_device_factory(&self, device_type: String) -> Option<Rc<dyn DeviceFactory>> {
+    fn get_device_factory(&self, device_type: String) -> Option<Box<dyn DeviceFactory>> {
         self.device_factory_registry
             .get_device_factory(&device_type)
     }
@@ -169,7 +169,7 @@ mod test {
         operations.register_device_factory(
             "MockDevice".to_string(),
             "Mock Device".to_string(),
-            Rc::new(MockDeviceFactory),
+            || Box::new(MockDeviceFactory),
         );
 
         let available_factories = operations.get_available_device_factories();
@@ -191,7 +191,7 @@ mod test {
         operations.register_device_factory(
             "MockDevice".to_string(),
             "Mock Device".to_string(),
-            Rc::new(MockDeviceFactory),
+            || Box::new(MockDeviceFactory),
         );
 
         let device_factory = operations.get_device_factory("MockDevice".to_string());
@@ -208,7 +208,7 @@ mod test {
         operations.register_device_factory(
             "MockDevice".to_string(),
             "Mock Device".to_string(),
-            Rc::new(MockDeviceFactory),
+            || Box::new(MockDeviceFactory),
         );
 
         let device_factory = operations.get_device_factory("NotAdded".to_string());
@@ -229,11 +229,9 @@ mod test {
     #[test]
     fn when_listing_devices_with_one_it_is_returned() {
         let mut registry = DeviceFactoryRegistry::new();
-        registry.register_device(
-            "MockDevice".to_string(),
-            "Mock Device".to_string(),
-            Rc::new(MockDeviceFactory),
-        );
+        registry.register_device("MockDevice".to_string(), "Mock Device".to_string(), || {
+            Box::new(MockDeviceFactory)
+        });
 
         let operations = Operations {
             device_factory_registry: registry,
@@ -255,11 +253,9 @@ type = "MockDevice"
     #[test]
     fn when_adding_a_device_to_empty_config_it_shall_add_it_to_the_configuration() {
         let mut registry = DeviceFactoryRegistry::new();
-        registry.register_device(
-            "MockDevice".to_string(),
-            "Mock Device".to_string(),
-            Rc::new(MockDeviceFactory),
-        );
+        registry.register_device("MockDevice".to_string(), "Mock Device".to_string(), || {
+            Box::new(MockDeviceFactory)
+        });
 
         let mut provider = MockGlobalConfigProvider::new();
         provider
@@ -287,11 +283,9 @@ type = "MockDevice"
     #[test]
     fn when_adding_a_device_to_config_with_another_device_it_shall_add_it_to_the_configuration() {
         let mut registry = DeviceFactoryRegistry::new();
-        registry.register_device(
-            "MockDevice".to_string(),
-            "Mock Device".to_string(),
-            Rc::new(MockDeviceFactory),
-        );
+        registry.register_device("MockDevice".to_string(), "Mock Device".to_string(), || {
+            Box::new(MockDeviceFactory)
+        });
 
         let mut provider = MockGlobalConfigProvider::new();
         provider
@@ -327,11 +321,9 @@ type = "MockDevice"
     #[test]
     fn when_removing_last_device_by_name_it_shall_update_the_configuration() {
         let mut registry = DeviceFactoryRegistry::new();
-        registry.register_device(
-            "MockDevice".to_string(),
-            "Mock Device".to_string(),
-            Rc::new(MockDeviceFactory),
-        );
+        registry.register_device("MockDevice".to_string(), "Mock Device".to_string(), || {
+            Box::new(MockDeviceFactory)
+        });
 
         let mut provider = MockGlobalConfigProvider::new();
         provider
@@ -372,11 +364,9 @@ type = "MockDevice"
     #[test]
     fn when_retrieving_projects_from_config_with_one_ignored_project_it_shall_return_it() {
         let mut registry = DeviceFactoryRegistry::new();
-        registry.register_device(
-            "MockDevice".to_string(),
-            "Mock Device".to_string(),
-            Rc::new(MockDeviceFactory),
-        );
+        registry.register_device("MockDevice".to_string(), "Mock Device".to_string(), || {
+            Box::new(MockDeviceFactory)
+        });
 
         let operations = Operations {
             device_factory_registry: registry,
@@ -407,11 +397,9 @@ type = "IgnoredProject"
     #[test]
     fn when_retrieving_projects_from_config_with_one_project_it_shall_return_it() {
         let mut registry = DeviceFactoryRegistry::new();
-        registry.register_device(
-            "MockDevice".to_string(),
-            "Mock Device".to_string(),
-            Rc::new(MockDeviceFactory),
-        );
+        registry.register_device("MockDevice".to_string(), "Mock Device".to_string(), || {
+            Box::new(MockDeviceFactory)
+        });
 
         let operations = Operations {
             device_factory_registry: registry,
@@ -454,11 +442,9 @@ target_locations = 2
     #[test]
     fn when_retrieving_several_projects_from_config_it_shall_return_them() {
         let mut registry = DeviceFactoryRegistry::new();
-        registry.register_device(
-            "MockDevice".to_string(),
-            "Mock Device".to_string(),
-            Rc::new(MockDeviceFactory),
-        );
+        registry.register_device("MockDevice".to_string(), "Mock Device".to_string(), || {
+            Box::new(MockDeviceFactory)
+        });
 
         let operations = Operations {
             device_factory_registry: registry,
@@ -493,11 +479,9 @@ type = "UntrackedProject"
     #[test]
     fn when_adding_a_project_to_empty_config_it_shall_add_it_to_the_configuration() {
         let mut registry = DeviceFactoryRegistry::new();
-        registry.register_device(
-            "MockDevice".to_string(),
-            "Mock Device".to_string(),
-            Rc::new(MockDeviceFactory),
-        );
+        registry.register_device("MockDevice".to_string(), "Mock Device".to_string(), || {
+            Box::new(MockDeviceFactory)
+        });
 
         let mut provider = MockGlobalConfigProvider::new();
         provider
@@ -539,11 +523,9 @@ target_locations = 2
     #[test]
     fn when_adding_project_to_config_with_another_project_it_shall_add_it_to_the_configuration() {
         let mut registry = DeviceFactoryRegistry::new();
-        registry.register_device(
-            "MockDevice".to_string(),
-            "Mock Device".to_string(),
-            Rc::new(MockDeviceFactory),
-        );
+        registry.register_device("MockDevice".to_string(), "Mock Device".to_string(), || {
+            Box::new(MockDeviceFactory)
+        });
 
         let mut provider = MockGlobalConfigProvider::new();
         provider
@@ -599,11 +581,9 @@ target_locations = 2
     #[test]
     fn when_removing_last_project_by_name_it_shall_update_the_configuration() {
         let mut registry = DeviceFactoryRegistry::new();
-        registry.register_device(
-            "MockDevice".to_string(),
-            "Mock Device".to_string(),
-            Rc::new(MockDeviceFactory),
-        );
+        registry.register_device("MockDevice".to_string(), "Mock Device".to_string(), || {
+            Box::new(MockDeviceFactory)
+        });
 
         let mut provider = MockGlobalConfigProvider::new();
         provider
@@ -646,11 +626,9 @@ type = "IgnoredProject"
     #[test]
     fn when_removing_project_from_config_with_2_projects_it_shall_only_remove_one() {
         let mut registry = DeviceFactoryRegistry::new();
-        registry.register_device(
-            "MockDevice".to_string(),
-            "Mock Device".to_string(),
-            Rc::new(MockDeviceFactory),
-        );
+        registry.register_device("MockDevice".to_string(), "Mock Device".to_string(), || {
+            Box::new(MockDeviceFactory)
+        });
 
         let mut provider = MockGlobalConfigProvider::new();
         provider

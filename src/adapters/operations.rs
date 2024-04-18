@@ -26,7 +26,7 @@ pub mod device {
         /// Get a device factory by its key
         /// The key is the one returned by get_available_device_factories
         /// It might panic if the key does not exist
-        fn get_device_factory(&self, device_type: String) -> Option<Rc<dyn DeviceFactory>>;
+        fn get_device_factory(&self, device_type: String) -> Option<Box<dyn DeviceFactory>>;
 
         /// Add a device to the list of devices
         /// The device is built by the factory returned by get_device_factory

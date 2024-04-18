@@ -5,7 +5,6 @@ use crate::adapters::operations::device::DeviceOperations;
 use crate::adapters::operations::project::ProjectOperations;
 use crate::models::question::QuestionType;
 use crate::models::secondary_device::DeviceFactoryKey;
-use std::rc::Rc;
 
 const HELP: &str = r#"
 HibernaCLI
@@ -176,15 +175,14 @@ impl<'a, T: UserInterface, U: DeviceOperations, V: ProjectOperations> CommandRun
             .device_operations
             .get_device_factory(key.key.clone())
             .ok_or("No such device configuration exists")?;
+
         while device_factory.has_next() {
             let question_type = device_factory.get_question_type();
             let question_statement = device_factory.get_question_statement();
             let answer = self.ask_question(&question_type, &question_statement);
-            if let Some(device_factory) = Rc::get_mut(&mut device_factory) {
-                device_factory
-                    .set_question_answer(answer)
-                    .map_err(|_| "Failed to set answer")?;
-            }
+            device_factory
+                .set_question_answer(answer)
+                .map_err(|_| "Failed to set answer")?;
         }
         let device = device_factory
             .build()
@@ -495,7 +493,7 @@ mod tests {
                     .expect_build()
                     .times(1)
                     .returning(|| Ok(Box::new(MockDevice::new())));
-                Some(Rc::new(device_factory))
+                Some(Box::new(device_factory))
             });
         device_operations
             .expect_add_device()
@@ -570,7 +568,7 @@ mod tests {
                     .expect_build()
                     .times(1)
                     .returning(|| Ok(Box::new(MockDevice::new())));
-                Some(Rc::new(device_factory))
+                Some(Box::new(device_factory))
             });
         device_operations
             .expect_add_device()
