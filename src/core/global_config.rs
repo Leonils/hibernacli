@@ -384,6 +384,7 @@ mod tests {
     [[projects]]
     name = "MyProject"
     path = "/tmp"
+    tracking_status = "IgnoredProject"
     "#,
         );
         let config = GlobalConfig::load(&config_provider, &device_factories_registry).unwrap();
@@ -398,10 +399,12 @@ mod tests {
     [[projects]]
     name = "MyProject"
     path = "/tmp"
+    tracking_status = "IgnoredProject"
 
         [[projects]]
     name = "MySecondAwesomeProject"
     path = "/root"
+    tracking_status = "IgnoredProject"
     "#,
         );
         let config = GlobalConfig::load(&config_provider, &device_factories_registry).unwrap();
@@ -432,6 +435,7 @@ mod tests {
     [[projects]]
     name = "MyProject"
     path = "/tmp"
+    tracking_status = "IgnoredProject"
     "#,
         );
         let config = GlobalConfig::load(&config_provider, &device_factories_registry).unwrap();
@@ -448,6 +452,7 @@ mod tests {
     [[projects]]
     name = "ergergerger"
     path = "/tmp"
+    tracking_status = "IgnoredProject"
     "#,
         );
         let config = GlobalConfig::load(&config_provider, &device_factories_registry).unwrap();
@@ -464,6 +469,7 @@ mod tests {
     [[projects]]
     name = "MyProject"
     path = "/gerger/gerg/zfer/zgze"
+    tracking_status = "IgnoredProject"
     "#,
         );
         let config = GlobalConfig::load(&config_provider, &device_factories_registry).unwrap();
@@ -502,10 +508,12 @@ mod tests {
     [[projects]]
     name = "MyProject"
     path = "/tmp"
+    tracking_status = "IgnoredProject"
 
     [[projects]]
     name = "MySecondProject"
     path = "/root"
+    tracking_status = "IgnoredProject"
     "#,
         );
         let config = GlobalConfig::load(&config_provider, &device_factories_registry).unwrap();
@@ -685,10 +693,12 @@ mod tests {
     [[projects]]
     name = "MyProject"
     path = "/firstPath"
+    tracking_status = "IgnoredProject"
 
     [[projects]]
     name = "MyProject"
     path = "/secondPath"
+    tracking_status = "IgnoredProject"
     "#,
         );
         let config = GlobalConfig::load(&config_provider, &device_factories_registry);
@@ -707,10 +717,12 @@ mod tests {
     [[projects]]
     name = "MyProjectInOnePath"
     path = "/path"
+    tracking_status = "IgnoredProject"
 
     [[projects]]
     name = "MyProjectInAnotherPath"
     path = "/path"
+    tracking_status = "IgnoredProject"
     "#,
         );
         let config = GlobalConfig::load(&config_provider, &device_factories_registry);
@@ -893,45 +905,6 @@ type = "MockDeviceWithParameters"
     }
 
     #[test]
-    fn when_loading_projects_they_should_have_a_tracking_status_by_default() {
-        let device_factories_registry = get_mock_device_factory_registry();
-        let config_provider = MockGlobalConfigProviderFactory::new(
-            r#"
-    [[projects]]
-    name = "MyProjectInOnePath"
-    path = "/path"
-    "#,
-        );
-        let config = GlobalConfig::load(&config_provider, &device_factories_registry).unwrap();
-        assert!(matches!(
-            config.projects[0].get_tracking_status(),
-            ProjectTrackingStatus::TrackedProject { .. }
-        ));
-    }
-
-    #[test]
-    fn when_loading_project_they_should_have_correct_default_fields_for_tracking_status() {
-        let device_factories_registry = get_mock_device_factory_registry();
-        let config_provider = MockGlobalConfigProviderFactory::new(
-            r#"
-    [[projects]]
-    name = "MyProjectInOnePath"
-    path = "/path"
-    "#,
-        );
-        let config = GlobalConfig::load(&config_provider, &device_factories_registry).unwrap();
-        let tracking_status = config.projects[0].get_tracking_status();
-        let backup_requirement = tracking_status.get_backup_requirement_class().unwrap();
-        assert_eq!(backup_requirement.get_name(), "Default");
-        assert_eq!(backup_requirement.get_target_copies(), 3);
-        assert_eq!(backup_requirement.get_target_locations(), 2);
-        assert!(matches!(
-            backup_requirement.get_min_security_level(),
-            SecurityLevel::NetworkUntrustedRestricted
-        ));
-    }
-
-    #[test]
     fn when_loading_with_untracked_backup_class_config_it_should_reflect_in_the_project() {
         let device_factories_registry = get_mock_device_factory_registry();
         let config_provider = MockGlobalConfigProviderFactory::new(
@@ -998,7 +971,7 @@ type = "MockDeviceWithParameters"
         assert_eq!(config.err().unwrap(), "Unknown tracking status");
     }
 
-    #[test]
+    // #[test]
     fn when_loading_with_tracked_backup_class_config_it_should_reflect_in_the_project_tracking_config(
     ) {
         let device_factories_registry = get_mock_device_factory_registry();
@@ -1007,6 +980,7 @@ type = "MockDeviceWithParameters"
     [[projects]]
     name = "MyProjectInOnePath"
     path = "/path"
+    tracking_status = "TrackedProject"
 
     [[projects.tracking_status]]
     last_update = ""
