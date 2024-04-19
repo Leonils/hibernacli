@@ -12,15 +12,17 @@ Usage:
     hibernacli [command] [options]
 
 Commands:
-    help              Display this help message
-    --version or -v   Display the version of the application
-    device [opt]      Manage devices
-    config [opt]      Manage configuration
-
-Options:
-    ls or list        List all projects/devices
-    new               Create a new project/device
-    rm or remove       Remove a project/device
+    help                        Display this help message
+    
+    --version or -v             Display the version of the application
+    
+    device [opt]                Manage devices
+        ls or list                  List all devices
+        new MountedFolder           Create a new mounted folder device
+        rm or remove [device_name]  Remove a device
+    
+    project [opt]               Manage projects
+        ls or list                  List all projects
 "#;
 
 const INVALID_COMMAND: &str = "Invalid command, use 'help' to display available commands";
