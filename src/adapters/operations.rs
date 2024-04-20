@@ -1,6 +1,4 @@
 pub mod device {
-    use std::rc::Rc;
-
     #[cfg(test)]
     use mockall::automock;
 
@@ -48,6 +46,7 @@ pub mod project {
     #[cfg(test)]
     use mockall::automock;
 
+    #[derive(Debug, PartialEq)]
     pub struct AddProjectArgs {
         pub name: String,
         pub location: String,
