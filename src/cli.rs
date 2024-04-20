@@ -23,6 +23,7 @@ Commands:
     
     project [opt]               Manage projects
         ls or list                  List all projects
+        new                         Create a new project
 "#;
 
 const INVALID_COMMAND: &str = "Invalid command, use 'help' to display available commands";
