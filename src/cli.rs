@@ -17,13 +17,14 @@ Commands:
     --version or -v             Display the version of the application
     
     device [opt]                Manage devices
-        ls or list                  List all devices
-        new MountedFolder           Create a new mounted folder device
-        rm or remove [device_name]  Remove a device
+        ls or list                     List all devices
+        new MountedFolder              Create a new mounted folder device
+        rm or remove [device_name]     Remove a device
     
     project [opt]               Manage projects
-        ls or list                  List all projects
-        new                         Create a new project
+        ls or list                     List all projects
+        new                            Create a new project
+        rm or remove [project_name]    Remove a project
 "#;
 
 const INVALID_COMMAND: &str = "Invalid command, use 'help' to display available commands";
