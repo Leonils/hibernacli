@@ -269,19 +269,15 @@ mod tests {
     use crate::models::secondary_device::{MockDevice, MockDeviceFactory};
     use mockall::predicate::eq;
 
-    trait ExpectReadWrite {
-        fn expect_to_read(self, read_value: &str) -> Self;
-        fn expect_to_write(self, written_value: &str) -> Self;
-    }
-
-    impl ExpectReadWrite for MockUserInterface {
-        fn expect_to_read(mut self, read_value: &str) -> Self {
+    // Extends assertions of automock to easily test read/write to console
+    impl MockUserInterface {
+        fn expect_one_read(mut self, read_value: &str) -> Self {
             let r = read_value.to_string();
             self.expect_read().times(1).returning(move || Ok(r.clone()));
             self
         }
 
-        fn expect_to_write(mut self, written_value: &str) -> Self {
+        fn expect_one_write(mut self, written_value: &str) -> Self {
             self.expect_write()
                 .times(1)
                 .with(eq(written_value.to_string()))
@@ -307,7 +303,7 @@ mod tests {
     fn test_display_message() {
         let project_operations = MockProjectOperations::new();
         let message = "Hello, world!".to_string();
-        let console = MockUserInterface::new().expect_to_write(&message);
+        let console = MockUserInterface::new().expect_one_write(&message);
         let device_operations = MockDeviceOperations::new();
         let command_runner = CommandRunner::new(console, &device_operations, &project_operations);
         command_runner.display_message(&message);
@@ -316,7 +312,7 @@ mod tests {
     #[test]
     fn test_read_string() {
         let project_operations = MockProjectOperations::new();
-        let console = MockUserInterface::new().expect_to_read("Hello, world!");
+        let console = MockUserInterface::new().expect_one_read("Hello, world!");
         let device_operations = MockDeviceOperations::new();
         let command_runner = CommandRunner::new(console, &device_operations, &project_operations);
         let message = command_runner.read_string().unwrap();
@@ -326,7 +322,7 @@ mod tests {
     #[test]
     fn test_read_number() {
         let project_operations = MockProjectOperations::new();
-        let console = MockUserInterface::new().expect_to_read("42");
+        let console = MockUserInterface::new().expect_one_read("42");
         let device_operations = MockDeviceOperations::new();
         let command_runner = CommandRunner::new(console, &device_operations, &project_operations);
         let message = command_runner.read_number().unwrap();
@@ -336,7 +332,7 @@ mod tests {
     #[test]
     fn should_fail_for_a_number_with_letters() {
         let project_operations = MockProjectOperations::new();
-        let console = MockUserInterface::new().expect_to_read("42a");
+        let console = MockUserInterface::new().expect_one_read("42a");
         let device_operations = MockDeviceOperations::new();
         let command_runner = CommandRunner::new(console, &device_operations, &project_operations);
         let message = command_runner.read_number();
@@ -346,7 +342,7 @@ mod tests {
     #[test]
     fn display_help() {
         let project_operations = MockProjectOperations::new();
-        let console = MockUserInterface::new().expect_to_write(HELP);
+        let console = MockUserInterface::new().expect_one_write(HELP);
         let device_operations = MockDeviceOperations::new();
         let command_runner = CommandRunner::new(console, &device_operations, &project_operations);
         command_runner.display_help();
@@ -355,7 +351,7 @@ mod tests {
     #[test]
     fn display_help_when_running_with_help_command() {
         let project_operations = MockProjectOperations::new();
-        let console = MockUserInterface::new().expect_to_write(HELP);
+        let console = MockUserInterface::new().expect_one_write(HELP);
         let device_operations = MockDeviceOperations::new();
         let command_runner = CommandRunner::new(console, &device_operations, &project_operations);
         command_runner.run(vec!["/path/to/executable".to_string(), "help".to_string()]);
@@ -364,7 +360,7 @@ mod tests {
     #[test]
     fn display_invalid_command() {
         let project_operations = MockProjectOperations::new();
-        let console = MockUserInterface::new().expect_to_write(INVALID_COMMAND);
+        let console = MockUserInterface::new().expect_one_write(INVALID_COMMAND);
         let device_operations = MockDeviceOperations::new();
         let command_runner = CommandRunner::new(console, &device_operations, &project_operations);
         command_runner.run(vec![
@@ -376,7 +372,7 @@ mod tests {
     #[test]
     fn display_invalid_command_when_running_with_no_args() {
         let project_operations = MockProjectOperations::new();
-        let console = MockUserInterface::new().expect_to_write(INVALID_COMMAND);
+        let console = MockUserInterface::new().expect_one_write(INVALID_COMMAND);
         let device_operations = MockDeviceOperations::new();
         let command_runner = CommandRunner::new(console, &device_operations, &project_operations);
         command_runner.run(vec!["/path/to/executable".to_string()]);
@@ -385,7 +381,7 @@ mod tests {
     #[test]
     fn display_version_with_full_version_command() {
         let project_operations = MockProjectOperations::new();
-        let console = MockUserInterface::new().expect_to_write(VERSION);
+        let console = MockUserInterface::new().expect_one_write(VERSION);
         let device_operations = MockDeviceOperations::new();
         let command_runner = CommandRunner::new(console, &device_operations, &project_operations);
         command_runner.run(vec![
@@ -397,7 +393,7 @@ mod tests {
     #[test]
     fn display_version_with_short_version_command() {
         let project_operations = MockProjectOperations::new();
-        let console = MockUserInterface::new().expect_to_write(VERSION);
+        let console = MockUserInterface::new().expect_one_write(VERSION);
         let device_operations = MockDeviceOperations::new();
         let command_runner = CommandRunner::new(console, &device_operations, &project_operations);
         command_runner.run(vec!["/path/to/executable".to_string(), "-v".to_string()]);
@@ -418,8 +414,8 @@ mod tests {
         });
 
         let console = MockUserInterface::new()
-            .expect_to_write("Device: USBkey")
-            .expect_to_write("Device list:");
+            .expect_one_write("Device: USBkey")
+            .expect_one_write("Device list:");
 
         let command_runner = CommandRunner::new(console, &device_operations, &project_operations);
         command_runner.run(vec![
@@ -432,7 +428,7 @@ mod tests {
     #[test]
     fn display_invalid_command_when_running_with_device_command_and_no_subcommand() {
         let project_operations = MockProjectOperations::new();
-        let console = MockUserInterface::new().expect_to_write(INVALID_COMMAND);
+        let console = MockUserInterface::new().expect_one_write(INVALID_COMMAND);
         let device_operations = MockDeviceOperations::new();
         let command_runner = CommandRunner::new(console, &device_operations, &project_operations);
         command_runner.run(vec![
@@ -448,10 +444,10 @@ mod tests {
         let project_operations = MockProjectOperations::new();
 
         let console = MockUserInterface::new()
-            .expect_to_write(question)
-            .expect_to_read(friendly_name)
-            .expect_to_write("Creating new device of type:")
-            .expect_to_write("Device created successfully");
+            .expect_one_write(question)
+            .expect_one_read(friendly_name)
+            .expect_one_write("Creating new device of type:")
+            .expect_one_write("Device created successfully");
 
         let mut device_operations = MockDeviceOperations::new();
         device_operations
@@ -513,11 +509,11 @@ mod tests {
         let question = "What is the path to the device?";
         let project_operations = MockProjectOperations::new();
         let console = MockUserInterface::new()
-            .expect_to_write(question)
-            .expect_to_write("Enter a valid Unix path")
-            .expect_to_read("/mnt/usbkey")
-            .expect_to_write("Creating new device of type:")
-            .expect_to_write("Device created successfully");
+            .expect_one_write(question)
+            .expect_one_write("Enter a valid Unix path")
+            .expect_one_read("/mnt/usbkey")
+            .expect_one_write("Creating new device of type:")
+            .expect_one_write("Device created successfully");
 
         let mut device_operations = MockDeviceOperations::new();
         device_operations
@@ -577,7 +573,7 @@ mod tests {
     #[test]
     fn deleting_a_usb_key() {
         let project_operations = MockProjectOperations::new();
-        let console = MockUserInterface::new().expect_to_write("Removed device successfully");
+        let console = MockUserInterface::new().expect_one_write("Removed device successfully");
         let mut device_operations = MockDeviceOperations::new();
         device_operations
             .expect_remove_by_name()
@@ -597,7 +593,7 @@ mod tests {
     #[test]
     fn display_invalid_command_when_running_with_device_command_and_invalid_subcommand() {
         let project_operations = MockProjectOperations::new();
-        let console = MockUserInterface::new().expect_to_write(INVALID_COMMAND);
+        let console = MockUserInterface::new().expect_one_write(INVALID_COMMAND);
         let device_operations = MockDeviceOperations::new();
         let command_runner = CommandRunner::new(console, &device_operations, &project_operations);
         command_runner.run(vec![
@@ -614,7 +610,7 @@ mod tests {
             .expect_list_projects()
             .times(1)
             .returning(|| Ok(vec![]));
-        let console = MockUserInterface::new().expect_to_write("Project list:");
+        let console = MockUserInterface::new().expect_one_write("Project list:");
 
         let device_operations = MockDeviceOperations::new();
         let command_runner = CommandRunner::new(console, &device_operations, &project_operations);
@@ -628,7 +624,7 @@ mod tests {
     #[test]
     fn display_invalid_command_when_running_with_project_command_and_invalid_subcommand() {
         let project_operations = MockProjectOperations::new();
-        let console = MockUserInterface::new().expect_to_write(INVALID_COMMAND);
+        let console = MockUserInterface::new().expect_one_write(INVALID_COMMAND);
         let device_operations = MockDeviceOperations::new();
 
         let command_runner = CommandRunner::new(console, &device_operations, &project_operations);
@@ -652,12 +648,12 @@ mod tests {
             .return_const(Ok(()));
 
         let console = MockUserInterface::new()
-            .expect_to_write("What is the name of the project?")
-            .expect_to_read("MyProject")
-            .expect_to_write("What is the path to the project?")
-            .expect_to_write("Enter a valid Unix path")
-            .expect_to_read("/mnt/projects/myproject")
-            .expect_to_write("Project created successfully");
+            .expect_one_write("What is the name of the project?")
+            .expect_one_read("MyProject")
+            .expect_one_write("What is the path to the project?")
+            .expect_one_write("Enter a valid Unix path")
+            .expect_one_read("/mnt/projects/myproject")
+            .expect_one_write("Project created successfully");
 
         let device_operations = MockDeviceOperations::new();
         run_command!(
@@ -677,12 +673,12 @@ mod tests {
             .return_const(Err("Project already exists".to_string()));
 
         let console = MockUserInterface::new()
-            .expect_to_write("What is the name of the project?")
-            .expect_to_read("MyProject")
-            .expect_to_write("What is the path to the project?")
-            .expect_to_write("Enter a valid Unix path")
-            .expect_to_read("/mnt/projects/myproject")
-            .expect_to_write("Project already exists");
+            .expect_one_write("What is the name of the project?")
+            .expect_one_read("MyProject")
+            .expect_one_write("What is the path to the project?")
+            .expect_one_write("Enter a valid Unix path")
+            .expect_one_read("/mnt/projects/myproject")
+            .expect_one_write("Project already exists");
 
         let device_operations = MockDeviceOperations::new();
         run_command!(
