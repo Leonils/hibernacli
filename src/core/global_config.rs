@@ -217,8 +217,6 @@ impl GlobalConfig {
 
 #[cfg(test)]
 mod tests {
-    use std::rc::Rc;
-
     use mockall::predicate::eq;
 
     use crate::{

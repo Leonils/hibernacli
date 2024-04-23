@@ -2,7 +2,7 @@
 use mockall::automock;
 
 use crate::adapters::operations::device::DeviceOperations;
-use crate::adapters::operations::project::ProjectOperations;
+use crate::adapters::operations::project::{AddProjectArgs, ProjectOperations};
 use crate::models::question::QuestionType;
 use crate::models::secondary_device::DeviceFactoryKey;
 
@@ -23,6 +23,7 @@ Commands:
     
     project [opt]               Manage projects
         ls or list                  List all projects
+        new                         Create a new project
 "#;
 
 const INVALID_COMMAND: &str = "Invalid command, use 'help' to display available commands";
@@ -227,7 +228,10 @@ impl<'a, T: UserInterface, U: DeviceOperations, V: ProjectOperations> CommandRun
             "ls" | "list" => self
                 .display_project_list()
                 .unwrap_or_else(|e| self.display_message(&e)),
-            "new" | "rm" | "remove" => self.display_todo(),
+            "new" => self
+                .add_project()
+                .unwrap_or_else(|e| self.display_message(&e)),
+            "rm" | "remove" => self.display_todo(),
             _ => {
                 self.display_invalid_command();
             }
@@ -242,6 +246,19 @@ impl<'a, T: UserInterface, U: DeviceOperations, V: ProjectOperations> CommandRun
         }
         Ok(())
     }
+
+    fn add_project(&self) -> Result<(), String> {
+        let project_name = self.ask_for_string("What is the name of the project?");
+        let project_path = self.ask_for_unix_path("What is the path to the project?");
+        self.project_operations
+            .add_project(AddProjectArgs {
+                name: project_name,
+                location: project_path,
+            })
+            .map_err(|e| e.to_string())?;
+        self.display_message("Project created successfully");
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -251,6 +268,40 @@ mod tests {
     use crate::adapters::operations::project::MockProjectOperations;
     use crate::models::secondary_device::{MockDevice, MockDeviceFactory};
     use mockall::predicate::eq;
+
+    trait ExpectReadWrite {
+        fn expect_to_read(self, read_value: &str) -> Self;
+        fn expect_to_write(self, written_value: &str) -> Self;
+    }
+
+    impl ExpectReadWrite for MockUserInterface {
+        fn expect_to_read(mut self, read_value: &str) -> Self {
+            let r = read_value.to_string();
+            self.expect_read().times(1).returning(move || Ok(r.clone()));
+            self
+        }
+
+        fn expect_to_write(mut self, written_value: &str) -> Self {
+            self.expect_write()
+                .times(1)
+                .with(eq(written_value.to_string()))
+                .return_const(());
+            self
+        }
+    }
+
+    macro_rules! run_command {
+        ($console:ident, $device_operations:ident, $project_operations:ident, $args: expr) => {{
+            let command_runner =
+                CommandRunner::new($console, &$device_operations, &$project_operations);
+            let args_with_executable = format!("/path/to/executable {}", $args);
+            let split_args: Vec<String> = args_with_executable
+                .split_whitespace()
+                .map(|s| s.to_string())
+                .collect();
+            command_runner.run(split_args);
+        }};
+    }
 
     #[test]
     fn test_display_message() {
@@ -676,5 +727,59 @@ mod tests {
             "project".to_string(),
             "invalid".to_string(),
         ]);
+    }
+
+    #[test]
+    fn adding_a_new_project() {
+        let mut project_operations = MockProjectOperations::new();
+        project_operations
+            .expect_add_project()
+            .times(1)
+            .with(eq(AddProjectArgs {
+                name: "MyProject".to_string(),
+                location: "/mnt/projects/myproject".to_string(),
+            }))
+            .return_const(Ok(()));
+
+        let console = MockUserInterface::new()
+            .expect_to_write("What is the name of the project?")
+            .expect_to_read("MyProject")
+            .expect_to_write("What is the path to the project?")
+            .expect_to_write("Enter a valid Unix path")
+            .expect_to_read("/mnt/projects/myproject")
+            .expect_to_write("Project created successfully");
+
+        let device_operations = MockDeviceOperations::new();
+        run_command!(
+            console,
+            device_operations,
+            project_operations,
+            "project new"
+        );
+    }
+
+    #[test]
+    fn when_failing_to_add_a_project_it_shall_print_error_to_user() {
+        let mut project_operations = MockProjectOperations::new();
+        project_operations
+            .expect_add_project()
+            .times(1)
+            .return_const(Err("Project already exists".to_string()));
+
+        let console = MockUserInterface::new()
+            .expect_to_write("What is the name of the project?")
+            .expect_to_read("MyProject")
+            .expect_to_write("What is the path to the project?")
+            .expect_to_write("Enter a valid Unix path")
+            .expect_to_read("/mnt/projects/myproject")
+            .expect_to_write("Project already exists");
+
+        let device_operations = MockDeviceOperations::new();
+        run_command!(
+            console,
+            device_operations,
+            project_operations,
+            "project new"
+        );
     }
 }
