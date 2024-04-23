@@ -219,20 +219,14 @@ impl<'a, T: UserInterface, U: DeviceOperations, V: ProjectOperations> CommandRun
             return;
         }
 
-        match args[2].as_str() {
-            "ls" | "list" => self
-                .display_project_list()
-                .unwrap_or_else(|e| self.display_message(&e)),
-            "new" => self
-                .add_project()
-                .unwrap_or_else(|e| self.display_message(&e)),
-            "rm" | "remove" => self
-                .remove_project(args)
-                .unwrap_or_else(|e| self.display_message(&e)),
-            _ => {
-                self.display_invalid_command();
-            }
-        }
+        let result = match args[2].as_str() {
+            "ls" | "list" => self.display_project_list(),
+            "new" => self.add_project(),
+            "rm" | "remove" => self.remove_project(args),
+            _ => Ok(self.display_invalid_command()),
+        };
+
+        result.unwrap_or_else(|e| self.display_message(&e));
     }
 
     fn display_project_list(&self) -> Result<(), String> {
