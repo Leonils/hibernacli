@@ -17,17 +17,17 @@ Commands:
     --version or -v             Display the version of the application
     
     device [opt]                Manage devices
-        ls or list                  List all devices
-        new MountedFolder           Create a new mounted folder device
-        rm or remove [device_name]  Remove a device
+        ls or list                     List all devices
+        new MountedFolder              Create a new mounted folder device
+        rm or remove [device_name]     Remove a device
     
     project [opt]               Manage projects
-        ls or list                  List all projects
-        new                         Create a new project
+        ls or list                     List all projects
+        new                            Create a new project
+        rm or remove [project_name]    Remove a project
 "#;
 
 const INVALID_COMMAND: &str = "Invalid command, use 'help' to display available commands";
-const TODO_COMMAND: &str = "This command is not implemented yet, but it will be soon!";
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[cfg_attr(test, automock)]
@@ -136,10 +136,6 @@ impl<'a, T: UserInterface, U: DeviceOperations, V: ProjectOperations> CommandRun
         self.display_message(INVALID_COMMAND);
     }
 
-    fn display_todo(&self) {
-        self.display_message(TODO_COMMAND);
-    }
-
     fn run_device_command(&self, args: Vec<String>) {
         if args.len() < 3 {
             self.display_invalid_command();
@@ -224,18 +220,14 @@ impl<'a, T: UserInterface, U: DeviceOperations, V: ProjectOperations> CommandRun
             return;
         }
 
-        match args[2].as_str() {
-            "ls" | "list" => self
-                .display_project_list()
-                .unwrap_or_else(|e| self.display_message(&e)),
-            "new" => self
-                .add_project()
-                .unwrap_or_else(|e| self.display_message(&e)),
-            "rm" | "remove" => self.display_todo(),
-            _ => {
-                self.display_invalid_command();
-            }
-        }
+        let result = match args[2].as_str() {
+            "ls" | "list" => self.display_project_list(),
+            "new" => self.add_project(),
+            "rm" | "remove" => self.remove_project(args),
+            _ => Ok(self.display_invalid_command()),
+        };
+
+        result.unwrap_or_else(|e| self.display_message(&e));
     }
 
     fn display_project_list(&self) -> Result<(), String> {
@@ -257,6 +249,20 @@ impl<'a, T: UserInterface, U: DeviceOperations, V: ProjectOperations> CommandRun
             })
             .map_err(|e| e.to_string())?;
         self.display_message("Project created successfully");
+        Ok(())
+    }
+
+    fn remove_project(&self, args: Vec<String>) -> Result<(), String> {
+        if args.len() < 4 {
+            return Err(INVALID_COMMAND.to_string());
+        }
+
+        let project_name = args[3].as_str();
+        self.project_operations
+            .remove_project_by_name(project_name.to_string())
+            .map_err(|e| e.to_string())?;
+
+        self.display_message("Removed project successfully");
         Ok(())
     }
 }
@@ -780,6 +786,77 @@ mod tests {
             device_operations,
             project_operations,
             "project new"
+        );
+    }
+
+    #[test]
+    fn when_removing_existing_project_it_shall_send_remove_command() {
+        let console = MockUserInterface::new().expect_to_write("Removed project successfully");
+        let device_operations = MockDeviceOperations::new();
+        let mut project_operations = MockProjectOperations::new();
+        project_operations
+            .expect_remove_project_by_name()
+            .times(1)
+            .with(eq("MyProject".to_string()))
+            .return_const(Ok(()));
+
+        run_command!(
+            console,
+            device_operations,
+            project_operations,
+            "project remove MyProject"
+        );
+    }
+
+    #[test]
+    fn when_removing_project_but_without_name_it_shall_fail() {
+        let project_operations = MockProjectOperations::new();
+        let console = MockUserInterface::new().expect_to_write(INVALID_COMMAND);
+        let device_operations = MockDeviceOperations::new();
+
+        run_command!(
+            console,
+            device_operations,
+            project_operations,
+            "project remove"
+        );
+    }
+
+    #[test]
+    fn when_removing_project_with_underlying_error_it_shall_print_it() {
+        let mut project_operations = MockProjectOperations::new();
+        project_operations
+            .expect_remove_project_by_name()
+            .times(1)
+            .return_const(Err("Project not found".to_string()));
+
+        let console = MockUserInterface::new().expect_to_write("Project not found");
+
+        let device_operations = MockDeviceOperations::new();
+        run_command!(
+            console,
+            device_operations,
+            project_operations,
+            "project remove MyProject"
+        );
+    }
+
+    #[test]
+    fn when_removing_project_using_rm_command_it_shall_remove_project_too() {
+        let console = MockUserInterface::new().expect_to_write("Removed project successfully");
+        let device_operations = MockDeviceOperations::new();
+        let mut project_operations = MockProjectOperations::new();
+        project_operations
+            .expect_remove_project_by_name()
+            .times(1)
+            .with(eq("MyProject".to_string()))
+            .return_const(Ok(()));
+
+        run_command!(
+            console,
+            device_operations,
+            project_operations,
+            "project rm MyProject"
         );
     }
 }
