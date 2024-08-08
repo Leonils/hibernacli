@@ -91,6 +91,7 @@ impl<'a, T: UserInterface, U: DeviceOperations, V: ProjectOperations> CommandRun
         self.console.read()
     }
 
+    #[cfg(test)]
     fn read_number(&self) -> Result<i32, String> {
         let input = self.console.read()?;
         input
