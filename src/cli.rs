@@ -91,6 +91,7 @@ impl<'a, T: UserInterface, U: DeviceOperations, V: ProjectOperations> CommandRun
         self.console.read()
     }
 
+    #[cfg(test)]
     fn read_number(&self) -> Result<i32, String> {
         let input = self.console.read()?;
         input
@@ -697,7 +698,7 @@ mod tests {
 
     #[test]
     fn when_removing_existing_project_it_shall_send_remove_command() {
-        let console = MockUserInterface::new().expect_to_write("Removed project successfully");
+        let console = MockUserInterface::new().expect_one_write("Removed project successfully");
         let device_operations = MockDeviceOperations::new();
         let mut project_operations = MockProjectOperations::new();
         project_operations
@@ -717,7 +718,7 @@ mod tests {
     #[test]
     fn when_removing_project_but_without_name_it_shall_fail() {
         let project_operations = MockProjectOperations::new();
-        let console = MockUserInterface::new().expect_to_write(INVALID_COMMAND);
+        let console = MockUserInterface::new().expect_one_write(INVALID_COMMAND);
         let device_operations = MockDeviceOperations::new();
 
         run_command!(
@@ -736,7 +737,7 @@ mod tests {
             .times(1)
             .return_const(Err("Project not found".to_string()));
 
-        let console = MockUserInterface::new().expect_to_write("Project not found");
+        let console = MockUserInterface::new().expect_one_write("Project not found");
 
         let device_operations = MockDeviceOperations::new();
         run_command!(
@@ -749,7 +750,7 @@ mod tests {
 
     #[test]
     fn when_removing_project_using_rm_command_it_shall_remove_project_too() {
-        let console = MockUserInterface::new().expect_to_write("Removed project successfully");
+        let console = MockUserInterface::new().expect_one_write("Removed project successfully");
         let device_operations = MockDeviceOperations::new();
         let mut project_operations = MockProjectOperations::new();
         project_operations
