@@ -12,6 +12,37 @@ struct BackupIndexEntry {
     path: PathBuf,
 }
 
+impl BackupIndexEntry {
+    pub fn from_buffer(buffer: &mut Vec<u8>) -> Result<Self, io::Error> {
+        // Read the first 3 * 8 bytes as u64 values
+        let (ctime, mtime, size) = (
+            Self::read_u64(buffer, 0)?,
+            Self::read_u64(buffer, 8)?,
+            Self::read_u64(buffer, 16)?,
+        );
+
+        // Read the rest of the line as a path, excluding the newline character
+        let path = String::from_utf8(buffer[24..buffer.len() - 1].to_vec())
+            .map(|s| PathBuf::from(s))
+            .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Invalid data"))?;
+
+        Ok(BackupIndexEntry {
+            ctime,
+            mtime,
+            size,
+            path,
+        })
+    }
+
+    fn read_u64(buffer: &mut Vec<u8>, offset: usize) -> Result<u64, io::Error> {
+        Ok(u64::from_le_bytes(
+            buffer[offset..offset + 8]
+                .try_into()
+                .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Invalid data"))?,
+        ))
+    }
+}
+
 struct BackupIndex {
     index: HashMap<PathBuf, BackupIndexEntry>,
 }
@@ -22,28 +53,12 @@ impl BackupIndex {
 
         let mut buffer = Vec::new();
         while reader.read_until(b'\n', &mut buffer)? > 0 {
-            // Read the first 3 * 8 bytes as u64 values
-            let (ctime, mtime, size) = (
-                Self::read_u64(&mut buffer, 0)?,
-                Self::read_u64(&mut buffer, 8)?,
-                Self::read_u64(&mut buffer, 16)?,
-            );
-
-            // Read the rest of the line as a path, excluding the newline character
-            let path = String::from_utf8(buffer[24..buffer.len() - 1].to_vec())
-                .map(|s| PathBuf::from(s))
-                .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Invalid data"))?;
+            // Parse the entry from the buffer
+            let entry = BackupIndexEntry::from_buffer(&mut buffer)?;
+            let path = entry.path.clone();
 
             // Insert the entry into the index
-            index.insert(
-                path.clone(),
-                BackupIndexEntry {
-                    ctime,
-                    mtime,
-                    size,
-                    path,
-                },
-            );
+            index.insert(path.clone(), entry);
         }
 
         Ok(BackupIndex { index })
@@ -51,14 +66,6 @@ impl BackupIndex {
 
     pub fn get_entry(&self, path: &PathBuf) -> Option<&BackupIndexEntry> {
         self.index.get(path)
-    }
-
-    fn read_u64(buffer: &mut Vec<u8>, offset: usize) -> Result<u64, io::Error> {
-        Ok(u64::from_le_bytes(
-            buffer[offset..offset + 8]
-                .try_into()
-                .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Invalid data"))?,
-        ))
     }
 }
 
