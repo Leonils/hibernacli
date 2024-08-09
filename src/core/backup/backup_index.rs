@@ -10,6 +10,7 @@ struct BackupIndexEntry {
     mtime: u64,
     size: u64,
     path: PathBuf,
+    visited: bool,
 }
 
 impl BackupIndexEntry {
@@ -19,10 +20,11 @@ impl BackupIndexEntry {
             mtime,
             size,
             path,
+            visited: false,
         }
     }
 
-    pub fn from_buffer(buffer: &mut Vec<u8>) -> Result<Self, io::Error> {
+    fn from_buffer(buffer: &mut Vec<u8>) -> Result<Self, io::Error> {
         // Read the first 3 * 8 bytes as u64 values
         let (ctime, mtime, size) = (
             Self::read_u64(buffer, 0)?,
@@ -40,10 +42,11 @@ impl BackupIndexEntry {
             mtime,
             size,
             path,
+            visited: false,
         })
     }
 
-    pub fn to_buffer(&self) -> Vec<u8> {
+    fn to_buffer(&self) -> Vec<u8> {
         let mut buffer = Vec::new();
         buffer.extend_from_slice(&self.ctime.to_le_bytes());
         buffer.extend_from_slice(&self.mtime.to_le_bytes());
@@ -104,6 +107,27 @@ impl BackupIndex {
     fn insert(mut self, entry: BackupIndexEntry) -> Self {
         self.index.insert(entry.path.clone(), entry);
         self
+    }
+
+    fn has_changed(&self, path: &PathBuf, ctime: u64, mtime: u64, size: u64) -> bool {
+        match self.get_entry(path) {
+            Some(entry) => entry.ctime != ctime || entry.mtime != mtime || entry.size != size,
+            None => true,
+        }
+    }
+
+    fn mark_visited(mut self, path: &PathBuf) -> Self {
+        if let Some(entry) = self.index.get_mut(path) {
+            entry.visited = true;
+        }
+        self
+    }
+
+    fn enumerate_unvisited_entries(&self) -> impl Iterator<Item = &BackupIndexEntry> {
+        self.index
+            .values()
+            .filter(|entry| !entry.visited)
+            .into_iter()
     }
 }
 
@@ -186,5 +210,52 @@ mod tests {
             index.get_entry(&PathBuf::from("test2.txt")).unwrap(),
             &BackupIndexEntry::new(4, 5, 6, PathBuf::from("test2.txt")),
         );
+    }
+
+    #[test]
+    fn test_not_found_file_has_changed() {
+        let index = BackupIndex::new();
+        assert!(index.has_changed(&PathBuf::from("test.txt"), 1, 2, 3));
+    }
+
+    #[test]
+    fn test_found_old_file_mismatched_size_has_changed() {
+        let index =
+            BackupIndex::new().insert(BackupIndexEntry::new(1, 2, 3, PathBuf::from("test.txt")));
+        assert!(index.has_changed(&PathBuf::from("test.txt"), 1, 2, 4));
+    }
+
+    #[test]
+    fn test_found_old_file_mismatched_ctime_has_changed() {
+        let index =
+            BackupIndex::new().insert(BackupIndexEntry::new(1, 2, 3, PathBuf::from("test.txt")));
+        assert!(index.has_changed(&PathBuf::from("test.txt"), 2, 2, 3));
+    }
+
+    #[test]
+    fn test_found_old_file_mismatched_mtime_has_changed() {
+        let index =
+            BackupIndex::new().insert(BackupIndexEntry::new(1, 2, 3, PathBuf::from("test.txt")));
+        assert!(index.has_changed(&PathBuf::from("test.txt"), 1, 3, 3));
+    }
+
+    #[test]
+    fn test_found_old_file_has_not_changed() {
+        let index =
+            BackupIndex::new().insert(BackupIndexEntry::new(1, 2, 3, PathBuf::from("test.txt")));
+        assert!(!index.has_changed(&PathBuf::from("test.txt"), 1, 2, 3));
+    }
+
+    #[test]
+    fn test_mark_visited() {
+        let index = BackupIndex::new()
+            .insert(BackupIndexEntry::new(1, 2, 3, PathBuf::from("test.txt")))
+            .insert(BackupIndexEntry::new(4, 5, 6, PathBuf::from("test2.txt")));
+        let index = index.mark_visited(&PathBuf::from("test.txt"));
+
+        let unvisited_entries: Vec<&BackupIndexEntry> =
+            index.enumerate_unvisited_entries().collect();
+        assert_eq!(unvisited_entries.len(), 1);
+        assert_eq!(unvisited_entries[0].path, PathBuf::from("test2.txt"));
     }
 }
