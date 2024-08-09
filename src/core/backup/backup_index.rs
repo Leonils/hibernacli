@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    io::{BufRead, BufReader},
+    io::{self, BufRead},
     path::PathBuf,
 };
 
@@ -17,21 +17,22 @@ struct BackupIndex {
 }
 
 impl BackupIndex {
-    pub fn from_index_reader(mut reader: impl BufRead) -> Self {
+    pub fn from_index_reader(mut reader: impl BufRead) -> Result<Self, io::Error> {
         let mut index: HashMap<PathBuf, BackupIndexEntry> = HashMap::new();
 
         let mut buffer = Vec::new();
-        while reader.read_until(b'\n', &mut buffer).unwrap() > 0 {
+        while reader.read_until(b'\n', &mut buffer)? > 0 {
             // Read the first 3 * 8 bytes as u64 values
             let (ctime, mtime, size) = (
-                u64::from_le_bytes(buffer[0..8].try_into().unwrap()),
-                u64::from_le_bytes(buffer[8..16].try_into().unwrap()),
-                u64::from_le_bytes(buffer[16..24].try_into().unwrap()),
+                Self::read_u64(&mut buffer, 0)?,
+                Self::read_u64(&mut buffer, 8)?,
+                Self::read_u64(&mut buffer, 16)?,
             );
 
             // Read the rest of the line as a path, excluding the newline character
-            let path =
-                PathBuf::from(String::from_utf8(buffer[24..buffer.len() - 1].to_vec()).unwrap());
+            let path = String::from_utf8(buffer[24..buffer.len() - 1].to_vec())
+                .map(|s| PathBuf::from(s))
+                .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Invalid data"))?;
 
             // Insert the entry into the index
             index.insert(
@@ -45,19 +46,31 @@ impl BackupIndex {
             );
         }
 
-        BackupIndex { index }
+        Ok(BackupIndex { index })
+    }
+
+    pub fn get_entry(&self, path: &PathBuf) -> Option<&BackupIndexEntry> {
+        self.index.get(path)
+    }
+
+    fn read_u64(buffer: &mut Vec<u8>, offset: usize) -> Result<u64, io::Error> {
+        Ok(u64::from_le_bytes(
+            buffer[offset..offset + 8]
+                .try_into()
+                .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Invalid data"))?,
+        ))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Cursor;
+    use std::io::{BufReader, Cursor};
 
     #[test]
     fn test_read_from_empty_file() {
         let reader = Cursor::new(b"");
-        let index = BackupIndex::from_index_reader(BufReader::new(reader));
+        let index = BackupIndex::from_index_reader(BufReader::new(reader)).unwrap();
         assert_eq!(index.index.len(), 0);
     }
 
@@ -72,10 +85,10 @@ mod tests {
 
         // Create a reader from the buffer
         let reader = Cursor::new(buffer);
-        let index = BackupIndex::from_index_reader(BufReader::new(reader));
+        let index = BackupIndex::from_index_reader(BufReader::new(reader)).unwrap();
         assert_eq!(index.index.len(), 1);
         assert_eq!(
-            index.index.get(&PathBuf::from("test.txt")).unwrap(),
+            index.get_entry(&PathBuf::from("test.txt")).unwrap(),
             &BackupIndexEntry {
                 ctime: 1,
                 mtime: 2,
