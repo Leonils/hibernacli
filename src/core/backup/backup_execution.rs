@@ -1,9 +1,9 @@
-use std::path::PathBuf;
+use std::{io, path::PathBuf};
 use walkdir::WalkDir;
 
 use crate::core::util::metadata::MetadataExt;
 
-use super::backup_index::BackupIndex;
+use super::backup_index::{BackupIndex, ToBuffer};
 
 pub trait ArchiveWriter {
     fn add_file(&mut self, path: &PathBuf, ctime: u64, mtime: u64, size: u64);
@@ -56,10 +56,39 @@ impl BackupExecution {
         }
 
         for entry in self.index.enumerate_unvisited_entries() {
-            println!("Deleted: {}", entry.path().display());
             self.deleted_entries.push(PathBuf::from(entry.path()));
         }
 
+        Ok(())
+    }
+
+    #[cfg(test)]
+    pub fn from_new_index_and_deleted_entries(
+        new_index: BackupIndex,
+        deleted_entries: Vec<PathBuf>,
+    ) -> Self {
+        Self {
+            index: BackupIndex::new(),
+            new_index,
+            root_path: PathBuf::new(),
+            deleted_entries,
+        }
+    }
+}
+
+impl ToBuffer for BackupExecution {
+    fn to_index_writer(&self, mut writer: impl io::Write) -> Result<(), io::Error> {
+        // Number of entries
+        writer.write_all(&self.new_index.index_size().to_le_bytes())?;
+
+        // Write entries
+        self.new_index.to_index_writer(&mut writer)?;
+
+        // Write deleted entries
+        for entry in &self.deleted_entries {
+            writer.write_all(entry.to_str().unwrap().as_bytes())?;
+            writer.write_all(b"\n")?;
+        }
         Ok(())
     }
 }
@@ -275,5 +304,32 @@ mod tests {
             .with_entry(ctime, ctime, 13, PathBuf::from("unchanged.txt"))
             .with_entry(ctime, ctime, 13, PathBuf::from("updated.txt"));
         assert_eq!(new_index, expected_new_index);
+    }
+
+    #[test]
+    fn test_backup_execution_to_buffer() {
+        let mock_backup_execution = BackupExecution::from_new_index_and_deleted_entries(
+            BackupIndex::new()
+                .with_entry(1, 2, 3, PathBuf::from("test1.txt"))
+                .with_entry(4, 5, 6, PathBuf::from("test2.txt")),
+            vec![PathBuf::from("deleted.txt")],
+        );
+
+        let mut buffer = Vec::new();
+        mock_backup_execution.to_index_writer(&mut buffer).unwrap();
+
+        assert_eq!(
+            buffer,
+            b"\x02\x00\x00\x00\x00\x00\x00\x00\
+            \x01\x00\x00\x00\x00\x00\x00\x00\
+            \x02\x00\x00\x00\x00\x00\x00\x00\
+            \x03\x00\x00\x00\x00\x00\x00\x00\
+            test1.txt\n\
+            \x04\x00\x00\x00\x00\x00\x00\x00\
+            \x05\x00\x00\x00\x00\x00\x00\x00\
+            \x06\x00\x00\x00\x00\x00\x00\x00\
+            test2.txt\n\
+            deleted.txt\n"
+        );
     }
 }

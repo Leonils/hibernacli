@@ -18,6 +18,7 @@ mod core {
     }
 
     mod util {
+        pub mod buffer_ext;
         pub mod metadata;
     }
 

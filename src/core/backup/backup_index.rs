@@ -1,8 +1,14 @@
 use std::{
-    collections::HashMap,
+    collections::BTreeMap,
     io::{self, BufRead},
     path::{Path, PathBuf},
 };
+
+use crate::core::util::buffer_ext::BufferExt;
+
+pub trait ToBuffer {
+    fn to_index_writer(&self, writer: impl io::Write) -> Result<(), io::Error>;
+}
 
 #[derive(Debug, PartialEq)]
 pub struct BackupIndexEntry {
@@ -27,9 +33,15 @@ impl BackupIndexEntry {
     fn from_buffer(buffer: &mut Vec<u8>) -> Result<Self, io::Error> {
         // Read the first 3 * 8 bytes as u64 values
         let (ctime, mtime, size) = (
-            Self::read_u64(buffer, 0)?,
-            Self::read_u64(buffer, 8)?,
-            Self::read_u64(buffer, 16)?,
+            buffer
+                .read_u64_from_le(0)
+                .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Invalid data"))?,
+            buffer
+                .read_u64_from_le(8)
+                .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Invalid data"))?,
+            buffer
+                .read_u64_from_le(16)
+                .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Invalid data"))?,
         );
 
         // Read the rest of the line as a path, excluding the newline character
@@ -37,31 +49,7 @@ impl BackupIndexEntry {
             .map(|s| PathBuf::from(s))
             .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Invalid data"))?;
 
-        Ok(BackupIndexEntry {
-            ctime,
-            mtime,
-            size,
-            path,
-            visited: false,
-        })
-    }
-
-    fn to_buffer(&self) -> Vec<u8> {
-        let mut buffer = Vec::new();
-        buffer.extend_from_slice(&self.ctime.to_le_bytes());
-        buffer.extend_from_slice(&self.mtime.to_le_bytes());
-        buffer.extend_from_slice(&self.size.to_le_bytes());
-        buffer.extend_from_slice(self.path.to_str().unwrap().as_bytes());
-        buffer.push(b'\n');
-        buffer
-    }
-
-    fn read_u64(buffer: &mut Vec<u8>, offset: usize) -> Result<u64, io::Error> {
-        Ok(u64::from_le_bytes(
-            buffer[offset..offset + 8]
-                .try_into()
-                .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Invalid data"))?,
-        ))
+        Ok(BackupIndexEntry::new(ctime, mtime, size, path))
     }
 
     pub fn path(&self) -> &Path {
@@ -69,20 +57,31 @@ impl BackupIndexEntry {
     }
 }
 
+impl ToBuffer for BackupIndexEntry {
+    fn to_index_writer(&self, mut writer: impl io::Write) -> Result<(), io::Error> {
+        writer.write_all(&self.ctime.to_le_bytes())?;
+        writer.write_all(&self.mtime.to_le_bytes())?;
+        writer.write_all(&self.size.to_le_bytes())?;
+        writer.write_all(self.path.to_str().unwrap().as_bytes())?;
+        writer.write_all(b"\n")?;
+        Ok(())
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub struct BackupIndex {
-    index: HashMap<PathBuf, BackupIndexEntry>,
+    index: BTreeMap<PathBuf, BackupIndexEntry>,
 }
 
 impl BackupIndex {
     pub fn new() -> Self {
         BackupIndex {
-            index: HashMap::new(),
+            index: BTreeMap::new(),
         }
     }
 
     pub fn from_index_reader(mut reader: impl BufRead) -> Result<Self, io::Error> {
-        let mut index: HashMap<PathBuf, BackupIndexEntry> = HashMap::new();
+        let mut index = BTreeMap::new();
 
         let mut buffer = Vec::new();
         while reader.read_until(b'\n', &mut buffer)? > 0 {
@@ -96,13 +95,6 @@ impl BackupIndex {
         }
 
         Ok(BackupIndex { index })
-    }
-
-    pub fn to_index_writer(&self, mut writer: impl io::Write) -> Result<(), io::Error> {
-        for entry in self.index.values() {
-            writer.write_all(&entry.to_buffer())?;
-        }
-        Ok(())
     }
 
     pub fn insert(&mut self, ctime: u64, mtime: u64, size: u64, path: PathBuf) {
@@ -130,6 +122,10 @@ impl BackupIndex {
             .into_iter()
     }
 
+    pub fn index_size(&self) -> u64 {
+        self.index.len().try_into().unwrap()
+    }
+
     #[cfg(test)]
     pub fn with_entry(mut self, ctime: u64, mtime: u64, size: u64, path: PathBuf) -> Self {
         self.insert(ctime, mtime, size, path);
@@ -144,6 +140,15 @@ impl BackupIndex {
     #[cfg(test)]
     pub fn get_entry(&self, path: &Path) -> Option<&BackupIndexEntry> {
         self.index.get(path)
+    }
+}
+
+impl ToBuffer for BackupIndex {
+    fn to_index_writer(&self, mut writer: impl io::Write) -> Result<(), io::Error> {
+        for entry in self.index.values() {
+            entry.to_index_writer(&mut writer)?;
+        }
+        Ok(())
     }
 }
 
