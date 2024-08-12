@@ -69,6 +69,7 @@ impl BackupIndexEntry {
     }
 }
 
+#[derive(Debug, PartialEq)]
 pub struct BackupIndex {
     index: HashMap<PathBuf, BackupIndexEntry>,
 }
@@ -104,19 +105,13 @@ impl BackupIndex {
         Ok(())
     }
 
-    fn get_entry(&self, path: &Path) -> Option<&BackupIndexEntry> {
-        self.index.get(path)
-    }
-
-    #[cfg(test)]
-    pub fn insert(mut self, ctime: u64, mtime: u64, size: u64, path: PathBuf) -> Self {
+    pub fn insert(&mut self, ctime: u64, mtime: u64, size: u64, path: PathBuf) {
         let entry = BackupIndexEntry::new(ctime, mtime, size, path);
         self.index.insert(entry.path.clone(), entry);
-        self
     }
 
     pub fn has_changed(&self, path: &Path, ctime: u64, mtime: u64, size: u64) -> bool {
-        match self.get_entry(path) {
+        match self.index.get(path) {
             Some(entry) => entry.ctime != ctime || entry.mtime != mtime || entry.size != size,
             None => true,
         }
@@ -133,6 +128,22 @@ impl BackupIndex {
             .values()
             .filter(|entry| !entry.visited)
             .into_iter()
+    }
+
+    #[cfg(test)]
+    pub fn with_entry(mut self, ctime: u64, mtime: u64, size: u64, path: PathBuf) -> Self {
+        self.insert(ctime, mtime, size, path);
+        self
+    }
+
+    #[cfg(test)]
+    pub fn count(&self) -> usize {
+        self.index.len()
+    }
+
+    #[cfg(test)]
+    pub fn get_entry(&self, path: &Path) -> Option<&BackupIndexEntry> {
+        self.index.get(path)
     }
 }
 
@@ -177,7 +188,7 @@ mod tests {
 
     #[test]
     fn test_write_single_entry_index() {
-        let index = BackupIndex::new().insert(1, 2, 3, PathBuf::from("test.txt"));
+        let index = BackupIndex::new().with_entry(1, 2, 3, PathBuf::from("test.txt"));
 
         let mut writer = Vec::new();
         index.to_index_writer(&mut writer).unwrap();
@@ -193,8 +204,8 @@ mod tests {
     #[test]
     fn test_write_read_index_with_2_entries() {
         let index = BackupIndex::new()
-            .insert(1, 2, 3, PathBuf::from("test1.txt"))
-            .insert(4, 5, 6, PathBuf::from("test2.txt"));
+            .with_entry(1, 2, 3, PathBuf::from("test1.txt"))
+            .with_entry(4, 5, 6, PathBuf::from("test2.txt"));
 
         // Encode
         let mut writer = Vec::new();
@@ -224,33 +235,33 @@ mod tests {
 
     #[test]
     fn test_found_old_file_mismatched_size_has_changed() {
-        let index = BackupIndex::new().insert(1, 2, 3, PathBuf::from("test.txt"));
+        let index = BackupIndex::new().with_entry(1, 2, 3, PathBuf::from("test.txt"));
         assert!(index.has_changed(&PathBuf::from("test.txt"), 1, 2, 4));
     }
 
     #[test]
     fn test_found_old_file_mismatched_ctime_has_changed() {
-        let index = BackupIndex::new().insert(1, 2, 3, PathBuf::from("test.txt"));
+        let index = BackupIndex::new().with_entry(1, 2, 3, PathBuf::from("test.txt"));
         assert!(index.has_changed(&PathBuf::from("test.txt"), 2, 2, 3));
     }
 
     #[test]
     fn test_found_old_file_mismatched_mtime_has_changed() {
-        let index = BackupIndex::new().insert(1, 2, 3, PathBuf::from("test.txt"));
+        let index = BackupIndex::new().with_entry(1, 2, 3, PathBuf::from("test.txt"));
         assert!(index.has_changed(&PathBuf::from("test.txt"), 1, 3, 3));
     }
 
     #[test]
     fn test_found_old_file_has_not_changed() {
-        let index = BackupIndex::new().insert(1, 2, 3, PathBuf::from("test.txt"));
+        let index = BackupIndex::new().with_entry(1, 2, 3, PathBuf::from("test.txt"));
         assert!(!index.has_changed(&PathBuf::from("test.txt"), 1, 2, 3));
     }
 
     #[test]
     fn test_mark_visited() {
         let mut index = BackupIndex::new()
-            .insert(1, 2, 3, PathBuf::from("test.txt"))
-            .insert(4, 5, 6, PathBuf::from("test2.txt"));
+            .with_entry(1, 2, 3, PathBuf::from("test.txt"))
+            .with_entry(4, 5, 6, PathBuf::from("test2.txt"));
         index.mark_visited(&PathBuf::from("test.txt"));
 
         let unvisited_entries: Vec<&BackupIndexEntry> =
