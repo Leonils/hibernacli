@@ -2,6 +2,7 @@
 mod core {
     #[cfg(test)]
     pub mod test_utils {
+        pub mod fs;
         pub mod mocks;
     }
 
@@ -12,10 +13,10 @@ mod core {
     }
 
     mod backup {
+        mod backup_execution;
         mod backup_index;
     }
 
-    mod backup_execution;
     mod backup_exploration;
     mod device_factories_registry;
     mod global_config;
