@@ -17,6 +17,10 @@ mod core {
         mod backup_index;
     }
 
+    mod util {
+        pub mod metadata;
+    }
+
     mod backup_exploration;
     mod device_factories_registry;
     mod global_config;

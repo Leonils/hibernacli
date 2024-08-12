@@ -1,7 +1,7 @@
-use std::fs::Metadata;
 use std::path::PathBuf;
-use std::time::SystemTime;
 use walkdir::WalkDir;
+
+use crate::core::util::metadata::MetadataExt;
 
 use super::backup_index::BackupIndex;
 
@@ -25,8 +25,8 @@ impl BackupExecution {
                 .strip_prefix(&self.root_path)
                 .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
             let metadata = entry.metadata()?;
-            let ctime = Self::get_ctime(&metadata);
-            let mtime = Self::get_mtime(&metadata);
+            let ctime = metadata.ctime_ms();
+            let mtime = metadata.mtime_ms();
             let size = metadata.len();
 
             if self
@@ -46,24 +46,6 @@ impl BackupExecution {
 
         Ok(())
     }
-
-    fn get_ctime(metadata: &Metadata) -> u64 {
-        metadata
-            .created()
-            .unwrap()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_secs()
-    }
-
-    fn get_mtime(metadata: &Metadata) -> u64 {
-        metadata
-            .modified()
-            .unwrap()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_secs()
-    }
 }
 
 #[cfg(test)]
@@ -81,7 +63,7 @@ mod tests {
         write(dir.join("added.txt"), "Hello, world!").unwrap();
         write(dir.join("updated.txt"), "Hello, world!").unwrap();
         let metadata = metadata(dir.join("unchanged.txt")).unwrap();
-        let ctime = BackupExecution::get_ctime(&metadata);
+        let ctime = metadata.ctime_ms();
 
         // Prepare index
         let index = BackupIndex::new()
