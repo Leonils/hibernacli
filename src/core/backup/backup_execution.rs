@@ -5,6 +5,10 @@ use crate::core::util::metadata::MetadataExt;
 
 use super::backup_index::BackupIndex;
 
+pub trait ArchiveWriter {
+    fn add_file(&mut self, path: &PathBuf, ctime: u64, mtime: u64, size: u64);
+}
+
 pub struct BackupExecution {
     index: BackupIndex,
     new_index: BackupIndex,
@@ -22,7 +26,10 @@ impl BackupExecution {
         }
     }
 
-    pub fn execute(&mut self) -> Result<(), std::io::Error> {
+    pub fn execute(
+        &mut self,
+        archiver_writer: &mut impl ArchiveWriter,
+    ) -> Result<(), std::io::Error> {
         // Walk through the folder at root_path, and mark visited entries
         // in the index
         for entry in WalkDir::new(&self.root_path).min_depth(1) {
@@ -40,9 +47,7 @@ impl BackupExecution {
                 .index
                 .has_changed(path_relative_to_root, ctime, mtime, size)
             {
-                println!("Changed: {}", path_relative_to_root.display());
-            } else {
-                println!("Unchanged: {}", path_relative_to_root.display());
+                archiver_writer.add_file(&PathBuf::from(path_relative_to_root), ctime, mtime, size);
             }
 
             self.index.mark_visited(&path_relative_to_root);
@@ -69,6 +74,22 @@ mod tests {
 
     use super::*;
 
+    struct MockArchiveWriter {
+        added_files: Vec<(PathBuf, u64, u64, u64)>,
+    }
+    impl MockArchiveWriter {
+        fn new() -> Self {
+            Self {
+                added_files: Vec::new(),
+            }
+        }
+    }
+    impl ArchiveWriter for MockArchiveWriter {
+        fn add_file(&mut self, path: &PathBuf, ctime: u64, mtime: u64, size: u64) {
+            self.added_files.push((path.clone(), ctime, mtime, size));
+        }
+    }
+
     fn now() -> u64 {
         SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
@@ -84,7 +105,7 @@ mod tests {
 
         // Run backup execution
         let mut execution = BackupExecution::new(index, dir);
-        execution.execute().unwrap();
+        execution.execute(&mut MockArchiveWriter::new()).unwrap();
 
         // Should be not deleted entries
         assert_eq!(execution.deleted_entries.len(), 0);
@@ -104,11 +125,18 @@ mod tests {
         let index = BackupIndex::new();
 
         // Run backup execution
+        let mut archiver = MockArchiveWriter::new();
         let mut execution = BackupExecution::new(index, dir);
-        execution.execute().unwrap();
+        execution.execute(&mut archiver).unwrap();
 
         // Should be no deleted entries
         assert_eq!(execution.deleted_entries.len(), 0);
+
+        // Check archiver
+        assert_eq!(
+            vec![(PathBuf::from("added.txt"), ctime, ctime, 13)],
+            archiver.added_files
+        );
 
         // Should be one new entry in new index
         let new_index = execution.new_index;
@@ -127,8 +155,12 @@ mod tests {
         let index = BackupIndex::new().with_entry(ctime, ctime, 13, PathBuf::from("deleted.txt"));
 
         // Run backup execution
+        let mut archiver = MockArchiveWriter::new();
         let mut execution = BackupExecution::new(index, dir);
-        execution.execute().unwrap();
+        execution.execute(&mut archiver).unwrap();
+
+        // Nothing in the archive
+        assert_eq!(archiver.added_files.len(), 0);
 
         // Check deleted entries
         assert_eq!(execution.deleted_entries.len(), 1);
@@ -152,8 +184,12 @@ mod tests {
         let index = BackupIndex::new().with_entry(ctime, ctime, 13, PathBuf::from("unchanged.txt"));
 
         // Run backup execution
+        let mut archiver = MockArchiveWriter::new();
         let mut execution = BackupExecution::new(index, dir);
-        execution.execute().unwrap();
+        execution.execute(&mut archiver).unwrap();
+
+        // Empty archive
+        assert_eq!(archiver.added_files.len(), 0);
 
         // Check deleted entries
         assert_eq!(execution.deleted_entries.len(), 0);
@@ -178,8 +214,15 @@ mod tests {
             BackupIndex::new().with_entry(ctime - 10, ctime - 10, 13, PathBuf::from("updated.txt"));
 
         // Run backup execution
+        let mut archiver = MockArchiveWriter::new();
         let mut execution = BackupExecution::new(index, dir);
-        execution.execute().unwrap();
+        execution.execute(&mut archiver).unwrap();
+
+        // Check archiver
+        assert_eq!(
+            vec![(PathBuf::from("updated.txt"), ctime, ctime, 13)],
+            archiver.added_files
+        );
 
         // Check deleted entries
         assert_eq!(execution.deleted_entries.len(), 0);
@@ -208,8 +251,18 @@ mod tests {
             .with_entry(ctime, ctime, 13, PathBuf::from("deleted.txt"));
 
         // Run backup execution
+        let mut archiver = MockArchiveWriter::new();
         let mut execution = BackupExecution::new(index, dir);
-        execution.execute().unwrap();
+        execution.execute(&mut archiver).unwrap();
+
+        // Check archiver
+        assert_eq!(
+            vec![
+                (PathBuf::from("updated.txt"), ctime, ctime, 13),
+                (PathBuf::from("added.txt"), ctime, ctime, 13),
+            ],
+            archiver.added_files
+        );
 
         // Check deleted entries
         assert_eq!(execution.deleted_entries.len(), 1);
