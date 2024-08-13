@@ -37,9 +37,6 @@ pub mod device {
         /// List all devices
         /// The list is sorted by the device name
         fn list(&self) -> Result<Vec<Box<dyn Device>>, String>;
-
-        /// Get a device location by its name
-        fn get_device_location(&self, name: &str) -> Result<String, String>;
     }
 }
 
@@ -75,8 +72,20 @@ pub mod project {
 
         /// List all projects with their status
         fn list_projects(&self) -> Result<Vec<Project>, String>;
+    }
+}
 
-        /// Get a project location by its name
-        fn get_project_location(&self, name: &str) -> Result<String, String>;
+pub mod backup {
+    #[cfg(test)]
+    use mockall::automock;
+
+    #[cfg_attr(test, automock)]
+    pub trait BackupOperations {
+        /// Backup one project by its name to one device by its name
+        fn backup_project_to_device(
+            &self,
+            project_name: &str,
+            device_name: &str,
+        ) -> Result<(), String>;
     }
 }

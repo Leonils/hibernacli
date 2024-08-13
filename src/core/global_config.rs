@@ -20,7 +20,7 @@ pub struct GlobalConfig {
 }
 
 impl GlobalConfig {
-    fn get_device_by_name(&self, name: &str) -> Option<&Box<dyn Device>> {
+    pub fn get_device_by_name(&self, name: &str) -> Option<&Box<dyn Device>> {
         self.devices.iter().find(|d| d.get_name() == name)
     }
 
@@ -54,20 +54,11 @@ impl GlobalConfig {
     pub fn get_devices_iter(&self) -> impl Iterator<Item = &Box<dyn Device>> {
         self.devices.iter()
     }
-
-    pub fn get_device_location(&self, name: &str) -> Option<String> {
-        self.get_device_by_name(name).map(|d| d.get_location())
-    }
 }
 
 impl GlobalConfig {
-    fn get_project_by_name(&self, name: &str) -> Option<&Project> {
+    pub fn get_project_by_name(&self, name: &str) -> Option<&Project> {
         self.projects.iter().find(|p| p.get_name() == name)
-    }
-
-    pub fn get_project_location(&self, name: &str) -> Option<String> {
-        self.get_project_by_name(name)
-            .map(|p| p.get_location().to_string())
     }
 
     fn get_project_by_path(&self, path: &str) -> Option<&Project> {

@@ -3,6 +3,7 @@ use std::time::SystemTime;
 use crate::{
     adapters::{
         operations::{
+            backup::BackupOperations,
             device::DeviceOperations,
             project::{AddProjectArgs, ProjectOperations},
         },
@@ -86,16 +87,6 @@ impl DeviceOperations for Operations {
         let devices = config.get_devices();
         Ok(devices)
     }
-
-    fn get_device_location(&self, name: &str) -> Result<String, String> {
-        let config = GlobalConfig::load(
-            self.global_config_provider.as_ref(),
-            &self.device_factory_registry,
-        )?;
-        config
-            .get_device_location(&name)
-            .ok_or_else(|| format!("Device not found: {}", name))
-    }
 }
 
 impl ProjectOperations for Operations {
@@ -142,15 +133,28 @@ impl ProjectOperations for Operations {
         let projects = config.get_projects();
         Ok(projects)
     }
+}
 
-    fn get_project_location(&self, name: &str) -> Result<String, String> {
+impl BackupOperations for Operations {
+    fn backup_project_to_device(
+        &self,
+        project_name: &str,
+        device_name: &str,
+    ) -> Result<(), String> {
         let config = GlobalConfig::load(
             self.global_config_provider.as_ref(),
             &self.device_factory_registry,
         )?;
-        config
-            .get_project_location(&name)
-            .ok_or_else(|| format!("Project not found: {}", name))
+
+        let project = config
+            .get_project_by_name(project_name)
+            .ok_or_else(|| format!("Project not found: {}", project_name))?;
+
+        let device = config
+            .get_device_by_name(device_name)
+            .ok_or_else(|| format!("Device not found: {}", device_name))?;
+
+        Ok(())
     }
 }
 
@@ -268,62 +272,6 @@ type = "MockDevice"
         assert!(devices.len() == 1);
         assert_eq!(devices[0].get_name(), "MockDevice");
         assert_eq!(devices[0].get_device_type_name(), "MockDevice");
-    }
-
-    #[test]
-    fn when_getting_device_location_from_no_config_it_shall_return_error() {
-        let operations = Operations {
-            device_factory_registry: DeviceFactoryRegistry::new(),
-            global_config_provider: Box::new(MockGlobalConfigProviderFactory::new(r#""#)),
-        };
-
-        let result = operations.get_device_location("MyDevice");
-        assert_eq!(result.unwrap_err(), "Device not found: MyDevice");
-    }
-
-    #[test]
-    fn when_getting_device_location_from_config_with_one_device_it_shall_return_it() {
-        let mut registry = DeviceFactoryRegistry::new();
-        registry.register_device("MockDevice".to_string(), "Mock Device".to_string(), || {
-            Box::new(MockDeviceFactory)
-        });
-
-        let operations = Operations {
-            device_factory_registry: registry,
-            global_config_provider: Box::new(MockGlobalConfigProviderFactory::new(
-                r#"
-[[devices]]
-name = "MockDevice"
-type = "MockDevice"
-"#,
-            )),
-        };
-
-        let location = operations.get_device_location("MockDevice").unwrap();
-        assert_eq!(location, "Home");
-    }
-
-    #[test]
-    fn when_getting_device_location_from_config_with_another_device_it_shall_return_it() {
-        let mut registry = DeviceFactoryRegistry::new();
-        registry.register_device("MockDevice".to_string(), "Mock Device".to_string(), || {
-            Box::new(MockDeviceFactory)
-        });
-
-        let operations = Operations {
-            device_factory_registry: registry,
-            global_config_provider: Box::new(MockGlobalConfigProviderFactory::new(
-                r#"
-[[devices]]
-name = "MockDevice"
-type = "MockDevice"
-location = "/path/to/device"
-"#,
-            )),
-        };
-
-        let location = operations.get_device_location("AnotherDevice");
-        assert_eq!(location.unwrap_err(), "Device not found: AnotherDevice");
     }
 
     #[test]
@@ -550,87 +498,6 @@ type = "UntrackedProject"
         assert_eq!(projects[0].get_location(), "/path/to/project");
         assert_eq!(projects[1].get_name(), "MyProject2");
         assert_eq!(projects[1].get_location(), "/path/to/project2");
-    }
-
-    #[test]
-    fn when_retrieving_single_project_location_from_no_config_it_shall_return_error() {
-        let operations = Operations {
-            device_factory_registry: DeviceFactoryRegistry::new(),
-            global_config_provider: Box::new(MockGlobalConfigProviderFactory::new(r#""#)),
-        };
-
-        let result = operations.get_project_location("MyProject");
-        assert!(result.unwrap_err().contains("Project not found"));
-    }
-
-    #[test]
-    fn when_retrieving_single_project_location_from_config_with_one_project_it_shall_return_it() {
-        let operations = Operations {
-            device_factory_registry: DeviceFactoryRegistry::new(),
-            global_config_provider: Box::new(MockGlobalConfigProviderFactory::new(
-                r#"[[projects]]
-path = "/path/to/project"
-name = "MyProject"
-
-[projects.tracking_status]
-last_update = "100"
-type = "IgnoredProject"
-"#,
-            )),
-        };
-
-        let location = operations.get_project_location("MyProject").unwrap();
-        assert_eq!(location, "/path/to/project");
-    }
-
-    #[test]
-    fn when_retrieving_single_project_location_from_config_with_another_project_it_shall_fail() {
-        let operations = Operations {
-            device_factory_registry: DeviceFactoryRegistry::new(),
-            global_config_provider: Box::new(MockGlobalConfigProviderFactory::new(
-                r#"[[projects]]
-path = "/path/to/project"
-name = "MyProject"
-
-[projects.tracking_status]
-last_update = "100"
-type = "IgnoredProject"
-"#,
-            )),
-        };
-
-        let not_found = operations
-            .get_project_location("AnotherProject")
-            .unwrap_err();
-        assert_eq!(not_found, "Project not found: AnotherProject");
-    }
-
-    #[test]
-    fn when_retrieving_single_project_location_from_config_with_two_projects_it_shall_return_it() {
-        let operations = Operations {
-            device_factory_registry: DeviceFactoryRegistry::new(),
-            global_config_provider: Box::new(MockGlobalConfigProviderFactory::new(
-                r#"[[projects]]
-path = "/path/to/project"
-name = "MyProject"
-
-[projects.tracking_status]
-last_update = "100"
-type = "UntrackedProject"
-
-[[projects]]
-path = "/path/to/project2"
-name = "MyProject2"
-
-[projects.tracking_status]
-last_update = "100"
-type = "UntrackedProject"
-"#,
-            )),
-        };
-
-        let location = operations.get_project_location("MyProject2").unwrap();
-        assert_eq!(location, "/path/to/project2");
     }
 
     #[test]
