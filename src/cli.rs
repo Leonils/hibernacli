@@ -157,7 +157,8 @@ impl<'a, T: UserInterface, U: DeviceOperations, V: ProjectOperations> CommandRun
         self.display_message("Device list:");
         let devices = self.device_operations.list().map_err(|e| e.to_string())?;
         for device in devices {
-            self.display_message(&format!("Device: {}", device.get_name()));
+            self.display_message(&format!("  - Device: {}", device.get_name()));
+            self.display_message(&format!("        Location: {}", device.get_location()));
         }
         Ok(())
     }
@@ -235,7 +236,8 @@ impl<'a, T: UserInterface, U: DeviceOperations, V: ProjectOperations> CommandRun
         self.display_message("Project list:");
         let projects = self.project_operations.list_projects()?;
         for project in projects {
-            self.display_message(&format!("Project: {}", project.get_name()));
+            self.display_message(&format!("  - Project: {}", project.get_name()));
+            self.display_message(&format!("        Location: {}", project.get_location()));
         }
         Ok(())
     }
@@ -417,11 +419,16 @@ mod tests {
                 .expect_get_name()
                 .times(1)
                 .returning(move || "USBkey".to_string());
+            device
+                .expect_get_location()
+                .times(1)
+                .returning(move || "/".to_string());
             Ok(vec![Box::new(device)])
         });
 
         let console = MockUserInterface::new()
-            .expect_one_write("Device: USBkey")
+            .expect_one_write("  - Device: USBkey")
+            .expect_one_write("        Location: /")
             .expect_one_write("Device list:");
 
         let command_runner = CommandRunner::new(console, &device_operations, &project_operations);
