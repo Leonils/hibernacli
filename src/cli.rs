@@ -25,6 +25,9 @@ Commands:
         ls or list                     List all projects
         new                            Create a new project
         rm or remove [project_name]    Remove a project
+
+    backup
+        run [project_name] [device_name]    Backup a project to a device
 "#;
 
 const INVALID_COMMAND: &str = "Invalid command, use 'help' to display available commands";
@@ -77,6 +80,7 @@ impl<'a, T: UserInterface, U: DeviceOperations, V: ProjectOperations> CommandRun
             "--version" | "-v" => self.display_version(),
             "device" => self.run_device_command(args),
             "project" => self.run_project_command(args),
+            "backup" => self.run_backup_command(args),
             _ => {
                 self.display_invalid_command();
             }
@@ -266,6 +270,31 @@ impl<'a, T: UserInterface, U: DeviceOperations, V: ProjectOperations> CommandRun
             .map_err(|e| e.to_string())?;
 
         self.display_message("Removed project successfully");
+        Ok(())
+    }
+
+    fn run_backup_command(&self, _args: Vec<String>) {
+        if _args.len() < 4 {
+            self.display_invalid_command();
+            return;
+        }
+
+        let result = match _args[2].as_str() {
+            "run" => self.run_backup(_args[3].as_str(), _args[4].as_str()),
+            _ => Ok(self.display_invalid_command()),
+        };
+
+        result.unwrap_or_else(|e| self.display_message(&e));
+    }
+
+    fn run_backup(&self, project_name: &str, device_name: &str) -> Result<(), String> {
+        let project_location = self.project_operations.get_project_location(project_name)?;
+        let device_location = self.device_operations.get_device_location(device_name)?;
+
+        self.display_message(&format!(
+            "Backing up project {} at location '{}' to device {} at location {}",
+            project_name, project_location, device_name, device_location
+        ));
         Ok(())
     }
 }

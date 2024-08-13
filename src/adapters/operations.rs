@@ -37,6 +37,9 @@ pub mod device {
         /// List all devices
         /// The list is sorted by the device name
         fn list(&self) -> Result<Vec<Box<dyn Device>>, String>;
+
+        /// Get a device location by its name
+        fn get_device_location(&self, name: &str) -> Result<String, String>;
     }
 }
 
@@ -65,11 +68,15 @@ pub mod project {
         /// The project is identified by its name, mut AddProjectArgs
         /// could be extended in the future to include more information
         fn add_project(&self, args: AddProjectArgs) -> Result<(), String>;
+
         /// A project shall be uniquely identified by its name
         /// So the name is enough to remove a project
         fn remove_project_by_name(&self, name: String) -> Result<(), String>;
 
         /// List all projects with their status
         fn list_projects(&self) -> Result<Vec<Project>, String>;
+
+        /// Get a project location by its name
+        fn get_project_location(&self, name: &str) -> Result<String, String>;
     }
 }
