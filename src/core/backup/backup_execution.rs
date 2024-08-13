@@ -32,7 +32,10 @@ impl BackupExecution {
     ) -> Result<(), std::io::Error> {
         // Walk through the folder at root_path, and mark visited entries
         // in the index
-        for entry in WalkDir::new(&self.root_path).min_depth(1) {
+        for entry in WalkDir::new(&self.root_path)
+            .min_depth(1)
+            .sort_by(|a, b| a.file_name().cmp(b.file_name()))
+        {
             let entry = entry.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
             let path_relative_to_root = entry
                 .path()
@@ -287,8 +290,8 @@ mod tests {
         // Check archiver
         assert_eq!(
             vec![
-                (PathBuf::from("updated.txt"), ctime, ctime, 13),
                 (PathBuf::from("added.txt"), ctime, ctime, 13),
+                (PathBuf::from("updated.txt"), ctime, ctime, 13),
             ],
             archiver.added_files
         );
