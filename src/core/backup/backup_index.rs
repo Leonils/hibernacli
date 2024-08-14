@@ -133,11 +133,6 @@ impl BackupIndex {
     }
 
     #[cfg(test)]
-    pub fn count(&self) -> usize {
-        self.index.len()
-    }
-
-    #[cfg(test)]
     pub fn get_entry(&self, path: &Path) -> Option<&BackupIndexEntry> {
         self.index.get(path)
     }

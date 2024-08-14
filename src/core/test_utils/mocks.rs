@@ -77,7 +77,7 @@ impl Device for MockDeviceWithParameters {
         table.insert("parameter".to_string(), self.parameter.clone().into());
         table
     }
-    fn read_backup_index(&self, project_name: &str) -> Result<Option<Box<dyn BufRead>>, String> {
+    fn read_backup_index(&self, _project_name: &str) -> Result<Option<Box<dyn BufRead>>, String> {
         Ok(None)
     }
     fn test_availability(&self) -> Result<(), String> {

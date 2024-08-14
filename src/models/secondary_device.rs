@@ -1,7 +1,7 @@
 #[cfg(test)]
 use mockall::automock;
 
-use std::{io::BufRead, path::PathBuf, time::Instant};
+use std::{fs::File, io::BufRead, path::PathBuf, time::Instant};
 
 use super::{backup_requirement::SecurityLevel, question::QuestionType};
 
@@ -45,10 +45,10 @@ pub trait Device {
 }
 
 pub trait ArchiveWriter {
-    fn add_file(&mut self, path: &PathBuf, ctime: u64, mtime: u64, size: u64);
+    fn add_file(&mut self, file: &mut File, path: &PathBuf, ctime: u64, mtime: u64, size: u64);
     fn add_directory(&mut self, path: &PathBuf, ctime: u64, mtime: u64);
     fn add_symlink(&mut self, path: &PathBuf, ctime: u64, mtime: u64, target: &PathBuf);
-    fn finalize(&mut self, deleted_files: Vec<PathBuf>);
+    fn finalize(&mut self, deleted_files: &Vec<PathBuf>);
 }
 
 #[cfg_attr(test, automock)]

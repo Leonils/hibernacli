@@ -103,8 +103,8 @@ impl ProjectTrackingStatus {
 
 pub struct ProjectCopy {
     // What is the last time a backup was made
-    last_backup: Option<Instant>,
+    _last_backup: Option<Instant>,
 
     // What is the device on which it was done?
-    secondary_device: dyn Device,
+    _secondary_device: dyn Device,
 }

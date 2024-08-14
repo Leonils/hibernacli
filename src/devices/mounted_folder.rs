@@ -6,7 +6,7 @@ use crate::{
     },
     now,
 };
-use std::{io::BufRead, path::PathBuf, time::Instant};
+use std::{fs::File, io::BufRead, path::PathBuf, time::Instant};
 use std::{path::Path, time::SystemTime};
 
 struct MountedFolder {
@@ -50,7 +50,7 @@ impl Device for MountedFolder {
         table
     }
 
-    fn read_backup_index(&self, project_name: &str) -> Result<Option<Box<dyn BufRead>>, String> {
+    fn read_backup_index(&self, _project_name: &str) -> Result<Option<Box<dyn BufRead>>, String> {
         Ok(None)
     }
 
@@ -68,9 +68,9 @@ impl Device for MountedFolder {
 
 pub struct MountedFolderArchiveWriter {
     path: PathBuf,
-    initialized: bool,
     project_dir: PathBuf,
     archive_path: PathBuf,
+    tar_builder: Option<tar::Builder<std::fs::File>>,
 }
 
 impl MountedFolderArchiveWriter {
@@ -84,15 +84,15 @@ impl MountedFolderArchiveWriter {
 
         MountedFolderArchiveWriter {
             path,
-            initialized: false,
             project_dir,
             archive_path,
+            tar_builder: None,
         }
     }
 
-    fn initialize(&mut self) {
-        if self.initialized {
-            return;
+    fn initialize<'a>(&'a mut self) -> &'a mut tar::Builder<std::fs::File> {
+        if self.tar_builder.is_some() {
+            return self.tar_builder.as_mut().unwrap();
         }
 
         println!("Initializing archive to {:?}", self.archive_path);
@@ -102,16 +102,33 @@ impl MountedFolderArchiveWriter {
             std::fs::create_dir_all(&self.project_dir).unwrap();
         }
 
+        // Verify that the archive file does not exist
+        if self.archive_path.exists() {
+            panic!("Archive file already exists");
+        }
+
         // create archive file
         std::fs::File::create(&self.archive_path).unwrap();
 
-        self.initialized = true;
+        // create tar builder
+        let file = std::fs::OpenOptions::new()
+            .write(true)
+            .open(&self.archive_path)
+            .unwrap();
+        self.tar_builder = Some(tar::Builder::new(file));
+
+        return self.tar_builder.as_mut().unwrap();
     }
 }
 
 impl ArchiveWriter for MountedFolderArchiveWriter {
-    fn add_file(&mut self, path: &PathBuf, _ctime: u64, _mtime: u64, _size: u64) {
-        self.initialize();
+    fn add_file(&mut self, file: &mut File, path: &PathBuf, _ctime: u64, _mtime: u64, _size: u64) {
+        self.initialize()
+            .append_file(
+                Path::join(Path::new(".files"), path.file_name().unwrap()),
+                file,
+            )
+            .unwrap();
         println!("Adding file {:?} to {:?} secondary device", path, self.path);
     }
 
@@ -129,8 +146,25 @@ impl ArchiveWriter for MountedFolderArchiveWriter {
         );
     }
 
-    fn finalize(&mut self, _deleted_files: Vec<PathBuf>) {
-        println!("Finalizing archive to {:?} secondary device", self.path);
+    fn finalize(&mut self, deleted_files: &Vec<PathBuf>) {
+        println!("Finalizing archive to {:?}", self.archive_path);
+
+        // Create a file with the list of deleted files
+        let deleted_files_data = deleted_files
+            .iter()
+            .map(|path| path.to_string_lossy())
+            .collect::<Vec<_>>()
+            .join("\n");
+        let deleted_files_data = deleted_files_data.as_bytes();
+
+        let mut header = tar::Header::new_gnu();
+        header.set_path(Path::new(".deleted-files")).unwrap();
+        header.set_size(deleted_files_data.len() as u64);
+        header.set_cksum();
+        let archive_writer = self.initialize();
+
+        archive_writer.append(&header, deleted_files_data).unwrap();
+        archive_writer.finish().unwrap();
     }
 }
 

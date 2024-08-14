@@ -10,6 +10,7 @@ license = "MIT"
 directories = "5.0"
 itertools = "0.12.1"
 serde = { version="1.0.197", features = ["derive"] }
+tar = "0.4.41"
 toml = "0.8.12"
 walkdir = "2.5.0"
 
