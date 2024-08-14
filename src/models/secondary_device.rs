@@ -1,7 +1,7 @@
 #[cfg(test)]
 use mockall::automock;
 
-use std::time::Instant;
+use std::{io::BufRead, path::PathBuf, time::Instant};
 
 use super::{backup_requirement::SecurityLevel, question::QuestionType};
 
@@ -33,6 +33,22 @@ pub trait Device {
 
     // Serialize the device to a TOML table
     fn to_toml_table(&self) -> toml::value::Table;
+
+    // Read the index of a backup from the device if the project is backed up on this device
+    fn read_backup_index(&self, project_name: &str) -> Result<Option<Box<dyn BufRead>>, String>;
+
+    // Test if the device is connected
+    fn test_availability(&self) -> Result<(), String>;
+
+    // Get the archive writer for the device
+    fn get_archive_writer(&self) -> Box<dyn ArchiveWriter>;
+}
+
+pub trait ArchiveWriter {
+    fn add_file(&mut self, path: &PathBuf, ctime: u64, mtime: u64, size: u64);
+    fn add_directory(&mut self, path: &PathBuf, ctime: u64, mtime: u64);
+    fn add_symlink(&mut self, path: &PathBuf, ctime: u64, mtime: u64, target: &PathBuf);
+    fn finalize(&mut self, deleted_files: Vec<PathBuf>);
 }
 
 #[cfg_attr(test, automock)]

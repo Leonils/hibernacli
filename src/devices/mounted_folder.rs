@@ -1,10 +1,13 @@
-use std::{path::PathBuf, time::Instant};
-
-use crate::models::{
-    backup_requirement::SecurityLevel,
-    question::{Question, QuestionType},
-    secondary_device::{Device, DeviceFactory},
+use crate::{
+    models::{
+        backup_requirement::SecurityLevel,
+        question::{Question, QuestionType},
+        secondary_device::{ArchiveWriter, Device, DeviceFactory},
+    },
+    now,
 };
+use std::{io::BufRead, path::PathBuf, time::Instant};
+use std::{path::Path, time::SystemTime};
 
 struct MountedFolder {
     name: Option<String>,
@@ -45,6 +48,89 @@ impl Device for MountedFolder {
         table.insert("path".to_string(), self.path.display().to_string().into());
         table.insert("name".to_string(), self.get_name().into());
         table
+    }
+
+    fn read_backup_index(&self, project_name: &str) -> Result<Option<Box<dyn BufRead>>, String> {
+        Ok(None)
+    }
+
+    fn test_availability(&self) -> Result<(), String> {
+        self.path.read_dir().map(|_| ()).map_err(|e| e.to_string())
+    }
+
+    fn get_archive_writer(&self) -> Box<dyn ArchiveWriter> {
+        Box::new(MountedFolderArchiveWriter::new(
+            self.path.clone(),
+            self.get_name(),
+        ))
+    }
+}
+
+pub struct MountedFolderArchiveWriter {
+    path: PathBuf,
+    initialized: bool,
+    project_dir: PathBuf,
+    archive_path: PathBuf,
+}
+
+impl MountedFolderArchiveWriter {
+    pub fn new(path: PathBuf, project_name: String) -> MountedFolderArchiveWriter {
+        let now = now!()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap() // we are after 1970, this should never fail
+            .as_secs();
+        let project_dir = Path::join(&path, &project_name);
+        let archive_path = Path::join(&project_dir, format!("{}.tar", now));
+
+        MountedFolderArchiveWriter {
+            path,
+            initialized: false,
+            project_dir,
+            archive_path,
+        }
+    }
+
+    fn initialize(&mut self) {
+        if self.initialized {
+            return;
+        }
+
+        println!("Initializing archive to {:?}", self.archive_path);
+
+        // create dir if missing
+        if !self.project_dir.exists() {
+            std::fs::create_dir_all(&self.project_dir).unwrap();
+        }
+
+        // create archive file
+        std::fs::File::create(&self.archive_path).unwrap();
+
+        self.initialized = true;
+    }
+}
+
+impl ArchiveWriter for MountedFolderArchiveWriter {
+    fn add_file(&mut self, path: &PathBuf, _ctime: u64, _mtime: u64, _size: u64) {
+        self.initialize();
+        println!("Adding file {:?} to {:?} secondary device", path, self.path);
+    }
+
+    fn add_directory(&mut self, path: &PathBuf, _ctime: u64, _mtime: u64) {
+        println!(
+            "Adding directory {:?} to {:?} secondary device",
+            path, self.path
+        );
+    }
+
+    fn add_symlink(&mut self, path: &PathBuf, _ctime: u64, _mtime: u64, _target: &PathBuf) {
+        println!(
+            "Adding symlink {:?} to {:?} secondary device",
+            path, self.path
+        );
+    }
+
+    fn finalize(&mut self, _deleted_files: Vec<PathBuf>) {
+        println!("Finalizing archive to {:?} secondary device", self.path);
     }
 }
 

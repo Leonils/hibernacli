@@ -1,4 +1,4 @@
-use std::time::SystemTime;
+use std::{path::PathBuf, time::SystemTime};
 
 use crate::{
     adapters::{
@@ -17,7 +17,11 @@ use crate::{
     now,
 };
 
-use super::{device_factories_registry::DeviceFactoryRegistry, global_config::GlobalConfig};
+use super::{
+    backup::{backup_execution::BackupExecution, backup_index::BackupIndex},
+    device_factories_registry::DeviceFactoryRegistry,
+    global_config::GlobalConfig,
+};
 
 pub struct Operations {
     device_factory_registry: DeviceFactoryRegistry,
@@ -153,6 +157,23 @@ impl BackupOperations for Operations {
         let device = config
             .get_device_by_name(device_name)
             .ok_or_else(|| format!("Device not found: {}", device_name))?;
+
+        device.test_availability()?;
+        project.test_availability()?;
+
+        let index = device
+            .read_backup_index(project.get_name())?
+            .map_or(BackupIndex::new(), |reader| {
+                BackupIndex::from_index_reader(reader).unwrap()
+            });
+
+        let project_root_path = PathBuf::from(project.get_location());
+        let mut backup_execution = BackupExecution::new(index, project_root_path);
+        let archive_writer = device.get_archive_writer();
+
+        backup_execution
+            .execute(archive_writer)
+            .map_err(|e| format!("Backup failed: {}", e))?;
 
         Ok(())
     }

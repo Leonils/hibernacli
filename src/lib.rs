@@ -13,8 +13,8 @@ mod core {
     }
 
     mod backup {
-        mod backup_execution;
-        mod backup_index;
+        pub mod backup_execution;
+        pub mod backup_index;
     }
 
     mod util {
