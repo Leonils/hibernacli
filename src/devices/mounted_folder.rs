@@ -144,6 +144,13 @@ impl MountedFolderArchiveWriter {
         let mut header = tar::Header::new_gnu();
         header.set_path(path).unwrap();
         header.set_size(data.len() as u64);
+        header.set_mtime(
+            now!()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+        );
+        header.set_mode(0o644);
         header.set_cksum();
         let archive_writer = self.initialize();
 
