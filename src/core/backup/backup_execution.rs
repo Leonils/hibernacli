@@ -1,9 +1,51 @@
-use std::{fs::File, path::PathBuf};
+use std::{fmt::Display, fs::File, path::PathBuf};
 use walkdir::WalkDir;
 
-use crate::{core::util::metadata::MetadataExt, models::secondary_device::ArchiveWriter};
+use crate::{
+    core::util::timestamps::{MetadataExt, TimeStampError},
+    models::secondary_device::ArchiveWriter,
+};
 
 use super::backup_index::{BackupIndex, ToBuffer};
+
+#[derive(Debug)]
+pub enum BackupExecutionError {
+    IoError(std::io::Error),
+    SystemTimeError(std::time::SystemTimeError),
+    StripPrefixError,
+}
+impl From<std::path::StripPrefixError> for BackupExecutionError {
+    fn from(_: std::path::StripPrefixError) -> Self {
+        Self::StripPrefixError
+    }
+}
+impl From<std::io::Error> for BackupExecutionError {
+    fn from(e: std::io::Error) -> Self {
+        Self::IoError(e)
+    }
+}
+impl From<TimeStampError> for BackupExecutionError {
+    fn from(e: TimeStampError) -> Self {
+        match e {
+            TimeStampError::IoError(e) => Self::IoError(e),
+            TimeStampError::SystemTimeError(e) => Self::SystemTimeError(e),
+        }
+    }
+}
+impl From<walkdir::Error> for BackupExecutionError {
+    fn from(e: walkdir::Error) -> Self {
+        Self::IoError(std::io::Error::from(e))
+    }
+}
+impl Display for BackupExecutionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::IoError(e) => write!(f, "IO error: {}", e),
+            Self::SystemTimeError(e) => write!(f, "System time error: {}", e),
+            Self::StripPrefixError => write!(f, "Strip prefix error"),
+        }
+    }
+}
 
 pub struct BackupExecution {
     index: BackupIndex,
@@ -11,7 +53,6 @@ pub struct BackupExecution {
     root_path: PathBuf,
     deleted_entries: Vec<PathBuf>,
 }
-
 impl BackupExecution {
     pub fn new(index: BackupIndex, root_path: PathBuf) -> Self {
         Self {
@@ -25,18 +66,15 @@ impl BackupExecution {
     pub fn execute(
         &mut self,
         mut archiver_writer: Box<dyn ArchiveWriter>,
-    ) -> Result<(), std::io::Error> {
+    ) -> Result<(), BackupExecutionError> {
         // Walk through the folder at root_path, and mark visited entries
         // in the index
         for entry in WalkDir::new(&self.root_path).min_depth(1) {
-            let entry = entry.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
-            let path_relative_to_root = entry
-                .path()
-                .strip_prefix(&self.root_path)
-                .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+            let entry = entry?;
+            let path_relative_to_root = entry.path().strip_prefix(&self.root_path)?;
             let metadata = entry.metadata()?;
-            let ctime = metadata.ctime_ms();
-            let mtime = metadata.mtime_ms();
+            let ctime = metadata.ctime_ms()?;
+            let mtime = metadata.mtime_ms()?;
             let size = metadata.len();
 
             if self
@@ -74,7 +112,7 @@ mod tests {
     use crate::core::test_utils::fs::create_tmp_dir;
 
     struct MockArchiveWriter {
-        added_files: Vec<(PathBuf, u64, u64, u64)>,
+        added_files: Vec<(PathBuf, u128, u128, u64)>,
     }
     impl MockArchiveWriter {
         fn new() -> Self {
@@ -88,16 +126,16 @@ mod tests {
             &mut self,
             _file: &mut File,
             path: &PathBuf,
-            ctime: u64,
-            mtime: u64,
+            ctime: u128,
+            mtime: u128,
             size: u64,
         ) {
             self.added_files.push((path.clone(), ctime, mtime, size));
         }
-        fn add_directory(&mut self, _path: &PathBuf, _ctime: u64, _mtime: u64) {
+        fn add_directory(&mut self, _path: &PathBuf, _ctime: u128, _mtime: u128) {
             panic!("Not implemented");
         }
-        fn add_symlink(&mut self, _path: &PathBuf, _ctime: u64, _mtime: u64, _target: &PathBuf) {
+        fn add_symlink(&mut self, _path: &PathBuf, _ctime: u128, _mtime: u128, _target: &PathBuf) {
             panic!("Not implemented");
         }
         fn finalize(&mut self, _deleted_files: &Vec<PathBuf>, _new_index: &Vec<u8>) {

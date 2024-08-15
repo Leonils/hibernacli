@@ -19,7 +19,7 @@ mod core {
 
     mod util {
         pub mod buffer_ext;
-        pub mod metadata;
+        pub mod timestamps;
     }
 
     mod backup_exploration;

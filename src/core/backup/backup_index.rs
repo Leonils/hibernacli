@@ -12,15 +12,15 @@ pub trait ToBuffer {
 
 #[derive(Debug, PartialEq)]
 pub struct BackupIndexEntry {
-    ctime: u64,
-    mtime: u64,
+    ctime: u128,
+    mtime: u128,
     size: u64,
     path: PathBuf,
     visited: bool,
 }
 
 impl BackupIndexEntry {
-    fn new(ctime: u64, mtime: u64, size: u64, path: PathBuf) -> Self {
+    fn new(ctime: u128, mtime: u128, size: u64, path: PathBuf) -> Self {
         BackupIndexEntry {
             ctime,
             mtime,
@@ -34,18 +34,18 @@ impl BackupIndexEntry {
         // Read the first 3 * 8 bytes as u64 values
         let (ctime, mtime, size) = (
             buffer
-                .read_u64_from_le(0)
+                .read_u128_from_le(0)
                 .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Invalid data"))?,
             buffer
-                .read_u64_from_le(8)
+                .read_u128_from_le(16)
                 .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Invalid data"))?,
             buffer
-                .read_u64_from_le(16)
+                .read_u64_from_le(32)
                 .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Invalid data"))?,
         );
 
         // Read the rest of the line as a path, excluding the newline character
-        let path = String::from_utf8(buffer[24..buffer.len() - 1].to_vec())
+        let path = String::from_utf8(buffer[40..buffer.len() - 1].to_vec())
             .map(|s| PathBuf::from(s))
             .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Invalid data"))?;
 
@@ -59,11 +59,17 @@ impl BackupIndexEntry {
 
 impl ToBuffer for BackupIndexEntry {
     fn to_buffer(&self) -> Result<Vec<u8>, io::Error> {
+        let path_str = self
+            .path
+            .to_str()
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "Invalid path string"))?
+            .as_bytes();
+
         let mut buffer = Vec::new();
         buffer.extend_from_slice(&self.ctime.to_le_bytes());
         buffer.extend_from_slice(&self.mtime.to_le_bytes());
         buffer.extend_from_slice(&self.size.to_le_bytes());
-        buffer.extend_from_slice(self.path.to_str().unwrap().as_bytes());
+        buffer.extend_from_slice(path_str);
         buffer.push(b'\n');
         Ok(buffer)
     }
@@ -98,12 +104,12 @@ impl BackupIndex {
         Ok(BackupIndex { index })
     }
 
-    pub fn insert(&mut self, ctime: u64, mtime: u64, size: u64, path: PathBuf) {
+    pub fn insert(&mut self, ctime: u128, mtime: u128, size: u64, path: PathBuf) {
         let entry = BackupIndexEntry::new(ctime, mtime, size, path);
         self.index.insert(entry.path.clone(), entry);
     }
 
-    pub fn has_changed(&self, path: &Path, ctime: u64, mtime: u64, size: u64) -> bool {
+    pub fn has_changed(&self, path: &Path, ctime: u128, mtime: u128, size: u64) -> bool {
         match self.index.get(path) {
             Some(entry) => entry.ctime != ctime || entry.mtime != mtime || entry.size != size,
             None => true,
@@ -124,7 +130,7 @@ impl BackupIndex {
     }
 
     #[cfg(test)]
-    pub fn with_entry(mut self, ctime: u64, mtime: u64, size: u64, path: PathBuf) -> Self {
+    pub fn with_entry(mut self, ctime: u128, mtime: u128, size: u64, path: PathBuf) -> Self {
         self.insert(ctime, mtime, size, path);
         self
     }

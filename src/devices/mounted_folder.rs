@@ -111,21 +111,21 @@ impl MountedFolderArchiveWriter {
         }
     }
 
-    fn initialize<'a>(&'a mut self) -> &'a mut tar::Builder<std::fs::File> {
+    fn initialize<'a>(&'a mut self) -> Result<&'a mut tar::Builder<std::fs::File>, &str> {
         if self.tar_builder.is_some() {
-            return self.tar_builder.as_mut().unwrap();
+            return self.tar_builder.as_mut().ok_or("Tar builder is missing");
         }
-
-        println!("Initializing archive to {:?}", self.archive_path);
 
         // create dir if missing
         if !self.project_dir.exists() {
-            std::fs::create_dir_all(&self.project_dir).unwrap();
+            std::fs::create_dir_all(&self.project_dir).map_err(|_| {
+                "Project directory is missing on secondary device and failed to be created"
+            })?;
         }
 
         // Verify that the archive file does not exist
         if self.archive_path.exists() {
-            panic!("Archive file already exists");
+            return Err("Archive file already exists");
         }
 
         // create archive file
@@ -136,9 +136,9 @@ impl MountedFolderArchiveWriter {
             .write(true)
             .open(&self.archive_path)
             .unwrap();
-        self.tar_builder = Some(tar::Builder::new(file));
 
-        return self.tar_builder.as_mut().unwrap();
+        self.tar_builder = Some(tar::Builder::new(file));
+        return self.tar_builder.as_mut().ok_or("Tar builder is missing");
     }
 
     fn add_file_from_bytes(&mut self, data: &[u8], path: &Path) {
@@ -154,7 +154,7 @@ impl MountedFolderArchiveWriter {
         );
         header.set_mode(0o644);
         header.set_cksum();
-        let archive_writer = self.initialize();
+        let archive_writer = self.initialize().unwrap();
 
         // Close archive
         archive_writer.append(&header, data).unwrap();
@@ -162,8 +162,16 @@ impl MountedFolderArchiveWriter {
 }
 
 impl ArchiveWriter for MountedFolderArchiveWriter {
-    fn add_file(&mut self, file: &mut File, path: &PathBuf, _ctime: u64, _mtime: u64, _size: u64) {
+    fn add_file(
+        &mut self,
+        file: &mut File,
+        path: &PathBuf,
+        _ctime: u128,
+        _mtime: u128,
+        _size: u64,
+    ) {
         self.initialize()
+            .unwrap()
             .append_file(
                 Path::join(Path::new(".files"), path.file_name().unwrap()),
                 file,
@@ -172,14 +180,14 @@ impl ArchiveWriter for MountedFolderArchiveWriter {
         println!("Adding file {:?} to {:?} secondary device", path, self.path);
     }
 
-    fn add_directory(&mut self, path: &PathBuf, _ctime: u64, _mtime: u64) {
+    fn add_directory(&mut self, path: &PathBuf, _ctime: u128, _mtime: u128) {
         println!(
             "Adding directory {:?} to {:?} secondary device",
             path, self.path
         );
     }
 
-    fn add_symlink(&mut self, path: &PathBuf, _ctime: u64, _mtime: u64, _target: &PathBuf) {
+    fn add_symlink(&mut self, path: &PathBuf, _ctime: u128, _mtime: u128, _target: &PathBuf) {
         println!(
             "Adding symlink {:?} to {:?} secondary device",
             path, self.path
