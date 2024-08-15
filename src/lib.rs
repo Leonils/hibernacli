@@ -17,7 +17,7 @@ mod core {
         pub mod backup_index;
     }
 
-    mod util {
+    pub mod util {
         pub mod buffer_ext;
         pub mod timestamps;
     }

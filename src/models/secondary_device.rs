@@ -1,7 +1,14 @@
 #[cfg(test)]
 use mockall::automock;
 
-use std::{fs::File, io::BufRead, path::PathBuf, time::Instant};
+use std::{
+    fs::File,
+    io::{self, BufRead},
+    path::PathBuf,
+    time::Instant,
+};
+
+use crate::core::util::timestamps::TimeStampError;
 
 use super::{backup_requirement::SecurityLevel, question::QuestionType};
 
@@ -44,11 +51,61 @@ pub trait Device {
     fn get_archive_writer(&self, project_name: &str) -> Box<dyn ArchiveWriter>;
 }
 
+pub struct ArchiveError {
+    pub message: String,
+}
+impl From<&str> for ArchiveError {
+    fn from(message: &str) -> Self {
+        ArchiveError {
+            message: message.to_string(),
+        }
+    }
+}
+impl From<io::Error> for ArchiveError {
+    fn from(error: io::Error) -> Self {
+        ArchiveError {
+            message: error.to_string(),
+        }
+    }
+}
+impl From<TimeStampError> for ArchiveError {
+    fn from(error: TimeStampError) -> Self {
+        ArchiveError {
+            message: error.to_string(),
+        }
+    }
+}
+
 pub trait ArchiveWriter {
-    fn add_file(&mut self, file: &mut File, path: &PathBuf, ctime: u128, mtime: u128, size: u64);
-    fn add_directory(&mut self, path: &PathBuf, ctime: u128, mtime: u128);
-    fn add_symlink(&mut self, path: &PathBuf, ctime: u128, mtime: u128, target: &PathBuf);
-    fn finalize(&mut self, deleted_files: &Vec<PathBuf>, new_index: &Vec<u8>);
+    fn add_file(
+        &mut self,
+        file: &mut File,
+        path: &PathBuf,
+        ctime: u128,
+        mtime: u128,
+        size: u64,
+    ) -> Result<(), ArchiveError>;
+
+    fn add_directory(
+        &mut self,
+        path: &PathBuf,
+        ctime: u128,
+        mtime: u128,
+    ) -> Result<(), ArchiveError>;
+
+    fn add_symlink(
+        &mut self,
+        path: &PathBuf,
+        ctime: u128,
+        mtime: u128,
+        target: &PathBuf,
+    ) -> Result<(), ArchiveError>;
+
+    fn finalize(
+        &mut self,
+        deleted_files: &Vec<PathBuf>,
+        new_index: &Vec<u8>,
+    ) -> Result<(), ArchiveError>;
 }
 
 #[cfg_attr(test, automock)]

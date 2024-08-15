@@ -1,20 +1,20 @@
 use flate2::write::GzEncoder;
 
 use crate::{
+    core::util::timestamps::Timestamp,
     models::{
         backup_requirement::SecurityLevel,
         question::{Question, QuestionType},
-        secondary_device::{ArchiveWriter, Device, DeviceFactory},
+        secondary_device::{ArchiveError, ArchiveWriter, Device, DeviceFactory},
     },
     now,
 };
 use std::{
     fs::File,
     io::{self, BufRead, Cursor, Read},
-    path::PathBuf,
-    time::Instant,
+    path::{Path, PathBuf},
+    time::{Instant, SystemTime},
 };
-use std::{path::Path, time::SystemTime};
 
 struct MountedFolder {
     name: Option<String>,
@@ -96,10 +96,7 @@ pub struct MountedFolderArchiveWriter {
 
 impl MountedFolderArchiveWriter {
     pub fn new(path: PathBuf, project_name: String) -> MountedFolderArchiveWriter {
-        let now = now!()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap() // we are after 1970, this should never fail
-            .as_millis();
+        let now = now!().ms_since_epoch().unwrap();
         let project_dir = Path::join(&path, &project_name);
         let archive_path = Path::join(&project_dir, format!("{}.tar", now));
 
@@ -111,9 +108,21 @@ impl MountedFolderArchiveWriter {
         }
     }
 
-    fn initialize<'a>(&'a mut self) -> Result<&'a mut tar::Builder<std::fs::File>, &str> {
+    fn try_get_tar_builder<'a>(
+        &'a mut self,
+    ) -> Result<&'a mut tar::Builder<std::fs::File>, ArchiveError> {
+        return self
+            .tar_builder
+            .as_mut()
+            .ok_or(ArchiveError::from("Tar builder is missing"));
+    }
+
+    fn initialize<'a>(&'a mut self) -> Result<&'a mut tar::Builder<std::fs::File>, ArchiveError> {
         if self.tar_builder.is_some() {
-            return self.tar_builder.as_mut().ok_or("Tar builder is missing");
+            return self
+                .tar_builder
+                .as_mut()
+                .ok_or(ArchiveError::from("Tar builder is missing"));
         }
 
         // create dir if missing
@@ -125,39 +134,33 @@ impl MountedFolderArchiveWriter {
 
         // Verify that the archive file does not exist
         if self.archive_path.exists() {
-            return Err("Archive file already exists");
+            return Err(ArchiveError::from("Archive file already exists"));
         }
 
         // create archive file
-        std::fs::File::create(&self.archive_path).unwrap();
+        std::fs::File::create(&self.archive_path)?;
 
         // create tar builder
         let file = std::fs::OpenOptions::new()
             .write(true)
-            .open(&self.archive_path)
-            .unwrap();
+            .open(&self.archive_path)?;
 
         self.tar_builder = Some(tar::Builder::new(file));
-        return self.tar_builder.as_mut().ok_or("Tar builder is missing");
+        return self.try_get_tar_builder();
     }
 
-    fn add_file_from_bytes(&mut self, data: &[u8], path: &Path) {
-        // Add it to archive
+    fn add_file_from_bytes(&mut self, data: &[u8], path: &Path) -> Result<(), ArchiveError> {
+        // Prepare headers
         let mut header = tar::Header::new_gnu();
-        header.set_path(path).unwrap();
+        header.set_path(path)?;
         header.set_size(data.len() as u64);
-        header.set_mtime(
-            now!()
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
-        );
+        header.set_mtime(now!().s_since_epoch()?);
         header.set_mode(0o644);
         header.set_cksum();
-        let archive_writer = self.initialize().unwrap();
 
-        // Close archive
-        archive_writer.append(&header, data).unwrap();
+        // Open archive and add file
+        self.initialize()?.append(&header, data)?;
+        Ok(())
     }
 }
 
@@ -169,32 +172,47 @@ impl ArchiveWriter for MountedFolderArchiveWriter {
         _ctime: u128,
         _mtime: u128,
         _size: u64,
-    ) {
-        self.initialize()
-            .unwrap()
-            .append_file(
-                Path::join(Path::new(".files"), path.file_name().unwrap()),
-                file,
-            )
-            .unwrap();
+    ) -> Result<(), ArchiveError> {
+        self.initialize()?.append_file(
+            Path::join(Path::new(".files"), path.file_name().unwrap()),
+            file,
+        )?;
         println!("Adding file {:?} to {:?} secondary device", path, self.path);
+        Ok(())
     }
 
-    fn add_directory(&mut self, path: &PathBuf, _ctime: u128, _mtime: u128) {
+    fn add_directory(
+        &mut self,
+        path: &PathBuf,
+        _ctime: u128,
+        _mtime: u128,
+    ) -> Result<(), ArchiveError> {
         println!(
             "Adding directory {:?} to {:?} secondary device",
             path, self.path
         );
+        Ok(())
     }
 
-    fn add_symlink(&mut self, path: &PathBuf, _ctime: u128, _mtime: u128, _target: &PathBuf) {
+    fn add_symlink(
+        &mut self,
+        path: &PathBuf,
+        _ctime: u128,
+        _mtime: u128,
+        _target: &PathBuf,
+    ) -> Result<(), ArchiveError> {
         println!(
             "Adding symlink {:?} to {:?} secondary device",
             path, self.path
         );
+        Ok(())
     }
 
-    fn finalize(&mut self, deleted_files: &Vec<PathBuf>, new_index: &Vec<u8>) {
+    fn finalize(
+        &mut self,
+        deleted_files: &Vec<PathBuf>,
+        new_index: &Vec<u8>,
+    ) -> Result<(), ArchiveError> {
         println!("Finalizing archive to {:?}", self.archive_path);
 
         // Create a file with the list of deleted files
@@ -204,30 +222,31 @@ impl ArchiveWriter for MountedFolderArchiveWriter {
             .collect::<Vec<_>>()
             .join("\n");
         let deleted_files_data = deleted_files_data.as_bytes();
-        self.add_file_from_bytes(deleted_files_data, Path::new(".deleted-files"));
+        self.add_file_from_bytes(deleted_files_data, Path::new(".deleted-files"))?;
 
         // Add a copy of the new index in the archive
-        self.add_file_from_bytes(&new_index, Path::new(".index"));
+        self.add_file_from_bytes(&new_index, Path::new(".index"))?;
 
         // Save the index for quick access to the latest version
         let current_index_path = Path::join(&self.project_dir, "current.index");
-        std::fs::write(&current_index_path, new_index).unwrap();
+        std::fs::write(&current_index_path, new_index)?;
 
         // End the archive
-        self.tar_builder.as_mut().unwrap().finish().unwrap();
+        self.try_get_tar_builder()?.finish()?;
 
         // Open the archive and a gzip file to compress it (just add .gz to the file name)
-        let tar_file = File::open(&self.archive_path).unwrap();
-        let gz_file = File::create(&format!("{}.gz", self.archive_path.display())).unwrap();
+        let tar_file = File::open(&self.archive_path)?;
+        let gz_file = File::create(&format!("{}.gz", self.archive_path.display()))?;
 
         // Compress the archive
-        let tar_file_size = tar_file.metadata().unwrap().len();
+        let tar_file_size = tar_file.metadata()?.len();
         let mut encoder = GzEncoder::new(gz_file, flate2::Compression::default());
-        io::copy(&mut tar_file.take(tar_file_size), &mut encoder).unwrap();
-        encoder.finish().unwrap();
+        io::copy(&mut tar_file.take(tar_file_size), &mut encoder)?;
+        encoder.finish()?;
 
         // Remove the uncompressed archive
-        std::fs::remove_file(&self.archive_path).unwrap();
+        std::fs::remove_file(&self.archive_path)?;
+        Ok(())
     }
 }
 

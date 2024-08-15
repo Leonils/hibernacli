@@ -3,7 +3,7 @@ use walkdir::WalkDir;
 
 use crate::{
     core::util::timestamps::{MetadataExt, TimeStampError},
-    models::secondary_device::ArchiveWriter,
+    models::secondary_device::{ArchiveError, ArchiveWriter},
 };
 
 use super::backup_index::{BackupIndex, ToBuffer};
@@ -13,6 +13,7 @@ pub enum BackupExecutionError {
     IoError(std::io::Error),
     SystemTimeError(std::time::SystemTimeError),
     StripPrefixError,
+    ArchiveError(String),
 }
 impl From<std::path::StripPrefixError> for BackupExecutionError {
     fn from(_: std::path::StripPrefixError) -> Self {
@@ -37,12 +38,18 @@ impl From<walkdir::Error> for BackupExecutionError {
         Self::IoError(std::io::Error::from(e))
     }
 }
+impl From<ArchiveError> for BackupExecutionError {
+    fn from(e: ArchiveError) -> Self {
+        Self::ArchiveError(e.message)
+    }
+}
 impl Display for BackupExecutionError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::IoError(e) => write!(f, "IO error: {}", e),
             Self::SystemTimeError(e) => write!(f, "System time error: {}", e),
             Self::StripPrefixError => write!(f, "Strip prefix error"),
+            Self::ArchiveError(e) => write!(f, "Archive error: {}", e),
         }
     }
 }
@@ -88,7 +95,7 @@ impl BackupExecution {
                     ctime,
                     mtime,
                     size,
-                );
+                )?;
             }
 
             self.index.mark_visited(&path_relative_to_root);
@@ -100,7 +107,7 @@ impl BackupExecution {
             self.deleted_entries.push(PathBuf::from(entry.path()));
         }
 
-        archiver_writer.finalize(&self.deleted_entries, &self.new_index.to_buffer()?);
+        archiver_writer.finalize(&self.deleted_entries, &self.new_index.to_buffer()?)?;
 
         Ok(())
     }
@@ -109,7 +116,7 @@ impl BackupExecution {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::test_utils::fs::create_tmp_dir;
+    use crate::{core::test_utils::fs::create_tmp_dir, models::secondary_device::ArchiveError};
 
     struct MockArchiveWriter {
         added_files: Vec<(PathBuf, u128, u128, u64)>,
@@ -129,16 +136,34 @@ mod tests {
             ctime: u128,
             mtime: u128,
             size: u64,
-        ) {
+        ) -> Result<(), ArchiveError> {
             self.added_files.push((path.clone(), ctime, mtime, size));
+            Ok(())
         }
-        fn add_directory(&mut self, _path: &PathBuf, _ctime: u128, _mtime: u128) {
+        fn add_directory(
+            &mut self,
+            _path: &PathBuf,
+            _ctime: u128,
+            _mtime: u128,
+        ) -> Result<(), ArchiveError> {
             panic!("Not implemented");
         }
-        fn add_symlink(&mut self, _path: &PathBuf, _ctime: u128, _mtime: u128, _target: &PathBuf) {
+        fn add_symlink(
+            &mut self,
+            _path: &PathBuf,
+            _ctime: u128,
+            _mtime: u128,
+            _target: &PathBuf,
+        ) -> Result<(), ArchiveError> {
             panic!("Not implemented");
         }
-        fn finalize(&mut self, _deleted_files: &Vec<PathBuf>, _new_index: &Vec<u8>) {}
+        fn finalize(
+            &mut self,
+            _deleted_files: &Vec<PathBuf>,
+            _new_index: &Vec<u8>,
+        ) -> Result<(), ArchiveError> {
+            Ok(())
+        }
     }
 
     #[test]
