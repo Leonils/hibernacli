@@ -158,8 +158,20 @@ impl BackupOperations for Operations {
             .get_device_by_name(device_name)
             .ok_or_else(|| format!("Device not found: {}", device_name))?;
 
-        device.test_availability()?;
-        project.test_availability()?;
+        device.test_availability().map_err(|e| {
+            format!(
+                "Device not available at location {}: {}",
+                device.get_location(),
+                e
+            )
+        })?;
+        project.test_availability().map_err(|e| {
+            format!(
+                "Project not available at location {}: {}",
+                project.get_location(),
+                e
+            )
+        })?;
 
         let index = device
             .read_backup_index(project.get_name())?
@@ -175,8 +187,6 @@ impl BackupOperations for Operations {
         backup_execution
             .execute(archive_writer)
             .map_err(|e| format!("Backup failed: {}", e))?;
-
-        // let new_index = backup_execution.get_new_index().to_index_writer(writer);
 
         Ok(())
     }
