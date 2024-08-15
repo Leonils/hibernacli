@@ -1,4 +1,4 @@
-use std::{fs::File, io, path::PathBuf};
+use std::{fs::File, path::PathBuf};
 use walkdir::WalkDir;
 
 use crate::{core::util::metadata::MetadataExt, models::secondary_device::ArchiveWriter};
@@ -61,25 +61,9 @@ impl BackupExecution {
         for entry in self.index.enumerate_unvisited_entries() {
             self.deleted_entries.push(PathBuf::from(entry.path()));
         }
-        archiver_writer.finalize(&self.deleted_entries);
 
-        Ok(())
-    }
-}
+        archiver_writer.finalize(&self.deleted_entries, &self.new_index.to_buffer()?);
 
-impl ToBuffer for BackupExecution {
-    fn to_index_writer(&self, mut writer: impl io::Write) -> Result<(), io::Error> {
-        // Number of entries
-        writer.write_all(&self.new_index.index_size().to_le_bytes())?;
-
-        // Write entries
-        self.new_index.to_index_writer(&mut writer)?;
-
-        // Write deleted entries
-        for entry in &self.deleted_entries {
-            writer.write_all(entry.to_str().unwrap().as_bytes())?;
-            writer.write_all(b"\n")?;
-        }
         Ok(())
     }
 }
@@ -116,7 +100,7 @@ mod tests {
         fn add_symlink(&mut self, _path: &PathBuf, _ctime: u64, _mtime: u64, _target: &PathBuf) {
             panic!("Not implemented");
         }
-        fn finalize(&mut self, _deleted_files: &Vec<PathBuf>) {
+        fn finalize(&mut self, _deleted_files: &Vec<PathBuf>, _new_index: &Vec<u8>) {
             panic!("Not implemented");
         }
     }

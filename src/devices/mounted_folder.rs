@@ -119,6 +119,18 @@ impl MountedFolderArchiveWriter {
 
         return self.tar_builder.as_mut().unwrap();
     }
+
+    fn add_file_from_bytes(&mut self, data: &[u8], path: &Path) {
+        // Add it to archive
+        let mut header = tar::Header::new_gnu();
+        header.set_path(path).unwrap();
+        header.set_size(data.len() as u64);
+        header.set_cksum();
+        let archive_writer = self.initialize();
+
+        // Close archive
+        archive_writer.append(&header, data).unwrap();
+    }
 }
 
 impl ArchiveWriter for MountedFolderArchiveWriter {
@@ -146,7 +158,7 @@ impl ArchiveWriter for MountedFolderArchiveWriter {
         );
     }
 
-    fn finalize(&mut self, deleted_files: &Vec<PathBuf>) {
+    fn finalize(&mut self, deleted_files: &Vec<PathBuf>, new_index: &Vec<u8>) {
         println!("Finalizing archive to {:?}", self.archive_path);
 
         // Create a file with the list of deleted files
@@ -157,14 +169,12 @@ impl ArchiveWriter for MountedFolderArchiveWriter {
             .join("\n");
         let deleted_files_data = deleted_files_data.as_bytes();
 
-        let mut header = tar::Header::new_gnu();
-        header.set_path(Path::new(".deleted-files")).unwrap();
-        header.set_size(deleted_files_data.len() as u64);
-        header.set_cksum();
-        let archive_writer = self.initialize();
+        self.add_file_from_bytes(deleted_files_data, Path::new(".deleted-files"));
+        self.add_file_from_bytes(&new_index, Path::new(".index"));
 
-        archive_writer.append(&header, deleted_files_data).unwrap();
-        archive_writer.finish().unwrap();
+        // Add the new index next to the archive
+        let current_index_path = Path::join(&self.project_dir, "current.index");
+        std::fs::write(&current_index_path, new_index).unwrap();
     }
 }
 

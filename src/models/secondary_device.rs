@@ -48,7 +48,7 @@ pub trait ArchiveWriter {
     fn add_file(&mut self, file: &mut File, path: &PathBuf, ctime: u64, mtime: u64, size: u64);
     fn add_directory(&mut self, path: &PathBuf, ctime: u64, mtime: u64);
     fn add_symlink(&mut self, path: &PathBuf, ctime: u64, mtime: u64, target: &PathBuf);
-    fn finalize(&mut self, deleted_files: &Vec<PathBuf>);
+    fn finalize(&mut self, deleted_files: &Vec<PathBuf>, new_index: &Vec<u8>);
 }
 
 #[cfg_attr(test, automock)]

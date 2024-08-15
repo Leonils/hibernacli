@@ -169,11 +169,13 @@ impl BackupOperations for Operations {
 
         let project_root_path = PathBuf::from(project.get_location());
         let mut backup_execution = BackupExecution::new(index, project_root_path);
-        let archive_writer = device.get_archive_writer();
+        let archive_writer = device.get_archive_writer(&project.get_name());
 
         backup_execution
             .execute(archive_writer)
             .map_err(|e| format!("Backup failed: {}", e))?;
+
+        // let new_index = backup_execution.get_new_index().to_index_writer(writer);
 
         Ok(())
     }

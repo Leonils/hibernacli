@@ -7,7 +7,7 @@ use std::{
 use crate::core::util::buffer_ext::BufferExt;
 
 pub trait ToBuffer {
-    fn to_index_writer(&self, writer: impl io::Write) -> Result<(), io::Error>;
+    fn to_buffer(&self) -> Result<Vec<u8>, io::Error>;
 }
 
 #[derive(Debug, PartialEq)]
@@ -58,13 +58,14 @@ impl BackupIndexEntry {
 }
 
 impl ToBuffer for BackupIndexEntry {
-    fn to_index_writer(&self, mut writer: impl io::Write) -> Result<(), io::Error> {
-        writer.write_all(&self.ctime.to_le_bytes())?;
-        writer.write_all(&self.mtime.to_le_bytes())?;
-        writer.write_all(&self.size.to_le_bytes())?;
-        writer.write_all(self.path.to_str().unwrap().as_bytes())?;
-        writer.write_all(b"\n")?;
-        Ok(())
+    fn to_buffer(&self) -> Result<Vec<u8>, io::Error> {
+        let mut buffer = Vec::new();
+        buffer.extend_from_slice(&self.ctime.to_le_bytes());
+        buffer.extend_from_slice(&self.mtime.to_le_bytes());
+        buffer.extend_from_slice(&self.size.to_le_bytes());
+        buffer.extend_from_slice(self.path.to_str().unwrap().as_bytes());
+        buffer.push(b'\n');
+        Ok(buffer)
     }
 }
 
@@ -122,10 +123,6 @@ impl BackupIndex {
             .into_iter()
     }
 
-    pub fn index_size(&self) -> u64 {
-        self.index.len().try_into().unwrap()
-    }
-
     #[cfg(test)]
     pub fn with_entry(mut self, ctime: u64, mtime: u64, size: u64, path: PathBuf) -> Self {
         self.insert(ctime, mtime, size, path);
@@ -139,11 +136,12 @@ impl BackupIndex {
 }
 
 impl ToBuffer for BackupIndex {
-    fn to_index_writer(&self, mut writer: impl io::Write) -> Result<(), io::Error> {
+    fn to_buffer(&self) -> Result<Vec<u8>, io::Error> {
+        let mut buffer = Vec::new();
         for entry in self.index.values() {
-            entry.to_index_writer(&mut writer)?;
+            buffer.extend_from_slice(&entry.to_buffer()?);
         }
-        Ok(())
+        Ok(buffer)
     }
 }
 
@@ -179,21 +177,20 @@ mod tests {
     }
 
     #[test]
-    fn test_write_empty_index() {
-        let index = BackupIndex::new();
-        let mut writer = Vec::new();
-        index.to_index_writer(&mut writer).unwrap();
-        assert_eq!(writer, b"");
+    fn test_empty_index_to_buffer() {
+        let buffer = BackupIndex::new().to_buffer().unwrap();
+        assert_eq!(buffer, b"");
     }
 
     #[test]
     fn test_write_single_entry_index() {
-        let index = BackupIndex::new().with_entry(1, 2, 3, PathBuf::from("test.txt"));
+        let buffer = BackupIndex::new()
+            .with_entry(1, 2, 3, PathBuf::from("test.txt"))
+            .to_buffer()
+            .unwrap();
 
-        let mut writer = Vec::new();
-        index.to_index_writer(&mut writer).unwrap();
         assert_eq!(
-            writer,
+            buffer,
             b"\x01\x00\x00\x00\x00\x00\x00\x00\
             \x02\x00\x00\x00\x00\x00\x00\x00\
             \x03\x00\x00\x00\x00\x00\x00\x00\
@@ -203,16 +200,14 @@ mod tests {
 
     #[test]
     fn test_write_read_index_with_2_entries() {
-        let index = BackupIndex::new()
+        let buffer = BackupIndex::new()
             .with_entry(1, 2, 3, PathBuf::from("test1.txt"))
-            .with_entry(4, 5, 6, PathBuf::from("test2.txt"));
-
-        // Encode
-        let mut writer = Vec::new();
-        index.to_index_writer(&mut writer).unwrap();
+            .with_entry(4, 5, 6, PathBuf::from("test2.txt"))
+            .to_buffer()
+            .unwrap();
 
         // Decode
-        let reader = Cursor::new(writer);
+        let reader = Cursor::new(buffer);
         let index = BackupIndex::from_index_reader(BufReader::new(reader)).unwrap();
 
         // Check
