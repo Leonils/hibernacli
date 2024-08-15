@@ -163,9 +163,10 @@ impl BackupOperations for Operations {
 
         let index = device
             .read_backup_index(project.get_name())?
-            .map_or(BackupIndex::new(), |reader| {
-                BackupIndex::from_index_reader(reader).unwrap()
-            });
+            .map_or(Ok(BackupIndex::new()), |reader| {
+                BackupIndex::from_index_reader(reader)
+            })
+            .map_err(|e| format!("Backup index read failed: {}", e))?;
 
         let project_root_path = PathBuf::from(project.get_location());
         let mut backup_execution = BackupExecution::new(index, project_root_path);
