@@ -20,7 +20,7 @@ pub struct GlobalConfig {
 }
 
 impl GlobalConfig {
-    fn get_device_by_name(&self, name: &str) -> Option<&Box<dyn Device>> {
+    pub fn get_device_by_name(&self, name: &str) -> Option<&Box<dyn Device>> {
         self.devices.iter().find(|d| d.get_name() == name)
     }
 
@@ -57,7 +57,7 @@ impl GlobalConfig {
 }
 
 impl GlobalConfig {
-    fn get_project_by_name(&self, name: &str) -> Option<&Project> {
+    pub fn get_project_by_name(&self, name: &str) -> Option<&Project> {
         self.projects.iter().find(|p| p.get_name() == name)
     }
 

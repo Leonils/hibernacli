@@ -1,4 +1,7 @@
-use std::time::{Instant, SystemTime};
+use std::{
+    path::PathBuf,
+    time::{Instant, SystemTime},
+};
 
 use super::{backup_requirement::BackupRequirementClass, secondary_device::Device};
 
@@ -40,6 +43,13 @@ impl Project {
 
     pub fn get_tracking_status(&self) -> &ProjectTrackingStatus {
         &self.tracking_status
+    }
+
+    pub fn test_availability(&self) -> Result<(), String> {
+        PathBuf::from(&self.location)
+            .read_dir()
+            .map(|_| ())
+            .map_err(|e| e.to_string())
     }
 }
 
@@ -93,8 +103,8 @@ impl ProjectTrackingStatus {
 
 pub struct ProjectCopy {
     // What is the last time a backup was made
-    last_backup: Option<Instant>,
+    _last_backup: Option<Instant>,
 
     // What is the device on which it was done?
-    secondary_device: dyn Device,
+    _secondary_device: dyn Device,
 }

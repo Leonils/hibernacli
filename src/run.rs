@@ -22,6 +22,6 @@ pub fn run(args: Vec<String>) {
         || Box::new(MountedFolderFactory::new()),
     );
 
-    let command_runner = CommandRunner::new(Console, &operations, &operations);
+    let command_runner = CommandRunner::new(Console, &operations, &operations, &operations);
     command_runner.run(args);
 }

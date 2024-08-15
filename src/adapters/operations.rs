@@ -65,11 +65,27 @@ pub mod project {
         /// The project is identified by its name, mut AddProjectArgs
         /// could be extended in the future to include more information
         fn add_project(&self, args: AddProjectArgs) -> Result<(), String>;
+
         /// A project shall be uniquely identified by its name
         /// So the name is enough to remove a project
         fn remove_project_by_name(&self, name: String) -> Result<(), String>;
 
         /// List all projects with their status
         fn list_projects(&self) -> Result<Vec<Project>, String>;
+    }
+}
+
+pub mod backup {
+    #[cfg(test)]
+    use mockall::automock;
+
+    #[cfg_attr(test, automock)]
+    pub trait BackupOperations {
+        /// Backup one project by its name to one device by its name
+        fn backup_project_to_device(
+            &self,
+            project_name: &str,
+            device_name: &str,
+        ) -> Result<(), String>;
     }
 }

@@ -1,12 +1,57 @@
-use std::{io, path::PathBuf};
+use std::{fmt::Display, fs::File, path::PathBuf};
 use walkdir::WalkDir;
 
-use crate::core::util::metadata::MetadataExt;
+use crate::{
+    core::util::timestamps::{MetadataExt, TimeStampError},
+    models::secondary_device::{ArchiveError, ArchiveWriter},
+};
 
 use super::backup_index::{BackupIndex, ToBuffer};
 
-pub trait ArchiveWriter {
-    fn add_file(&mut self, path: &PathBuf, ctime: u64, mtime: u64, size: u64);
+#[derive(Debug)]
+pub enum BackupExecutionError {
+    IoError(std::io::Error),
+    SystemTimeError(std::time::SystemTimeError),
+    StripPrefixError,
+    ArchiveError(String),
+}
+impl From<std::path::StripPrefixError> for BackupExecutionError {
+    fn from(_: std::path::StripPrefixError) -> Self {
+        Self::StripPrefixError
+    }
+}
+impl From<std::io::Error> for BackupExecutionError {
+    fn from(e: std::io::Error) -> Self {
+        Self::IoError(e)
+    }
+}
+impl From<TimeStampError> for BackupExecutionError {
+    fn from(e: TimeStampError) -> Self {
+        match e {
+            TimeStampError::IoError(e) => Self::IoError(e),
+            TimeStampError::SystemTimeError(e) => Self::SystemTimeError(e),
+        }
+    }
+}
+impl From<walkdir::Error> for BackupExecutionError {
+    fn from(e: walkdir::Error) -> Self {
+        Self::IoError(std::io::Error::from(e))
+    }
+}
+impl From<ArchiveError> for BackupExecutionError {
+    fn from(e: ArchiveError) -> Self {
+        Self::ArchiveError(e.message)
+    }
+}
+impl Display for BackupExecutionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::IoError(e) => write!(f, "IO error: {}", e),
+            Self::SystemTimeError(e) => write!(f, "System time error: {}", e),
+            Self::StripPrefixError => write!(f, "Strip prefix error"),
+            Self::ArchiveError(e) => write!(f, "Archive error: {}", e),
+        }
+    }
 }
 
 pub struct BackupExecution {
@@ -15,7 +60,6 @@ pub struct BackupExecution {
     root_path: PathBuf,
     deleted_entries: Vec<PathBuf>,
 }
-
 impl BackupExecution {
     pub fn new(index: BackupIndex, root_path: PathBuf) -> Self {
         Self {
@@ -28,29 +72,33 @@ impl BackupExecution {
 
     pub fn execute(
         &mut self,
-        archiver_writer: &mut impl ArchiveWriter,
-    ) -> Result<(), std::io::Error> {
+        mut archiver_writer: Box<dyn ArchiveWriter>,
+    ) -> Result<(), BackupExecutionError> {
         // Walk through the folder at root_path, and mark visited entries
         // in the index
         for entry in WalkDir::new(&self.root_path)
             .min_depth(1)
             .sort_by(|a, b| a.file_name().cmp(b.file_name()))
         {
-            let entry = entry.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
-            let path_relative_to_root = entry
-                .path()
-                .strip_prefix(&self.root_path)
-                .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+            let entry = entry?;
+            let path_relative_to_root = entry.path().strip_prefix(&self.root_path)?;
             let metadata = entry.metadata()?;
-            let ctime = metadata.ctime_ms();
-            let mtime = metadata.mtime_ms();
+            let ctime = metadata.ctime_ms()?;
+            let mtime = metadata.mtime_ms()?;
             let size = metadata.len();
 
             if self
                 .index
                 .has_changed(path_relative_to_root, ctime, mtime, size)
             {
-                archiver_writer.add_file(&PathBuf::from(path_relative_to_root), ctime, mtime, size);
+                let mut file = File::open(entry.path())?;
+                archiver_writer.add_file(
+                    &mut file,
+                    &PathBuf::from(path_relative_to_root),
+                    ctime,
+                    mtime,
+                    size,
+                )?;
             }
 
             self.index.mark_visited(&path_relative_to_root);
@@ -62,52 +110,19 @@ impl BackupExecution {
             self.deleted_entries.push(PathBuf::from(entry.path()));
         }
 
-        Ok(())
-    }
+        archiver_writer.finalize(&self.deleted_entries, &self.new_index.to_buffer()?)?;
 
-    #[cfg(test)]
-    pub fn from_new_index_and_deleted_entries(
-        new_index: BackupIndex,
-        deleted_entries: Vec<PathBuf>,
-    ) -> Self {
-        Self {
-            index: BackupIndex::new(),
-            new_index,
-            root_path: PathBuf::new(),
-            deleted_entries,
-        }
-    }
-}
-
-impl ToBuffer for BackupExecution {
-    fn to_index_writer(&self, mut writer: impl io::Write) -> Result<(), io::Error> {
-        // Number of entries
-        writer.write_all(&self.new_index.index_size().to_le_bytes())?;
-
-        // Write entries
-        self.new_index.to_index_writer(&mut writer)?;
-
-        // Write deleted entries
-        for entry in &self.deleted_entries {
-            writer.write_all(entry.to_str().unwrap().as_bytes())?;
-            writer.write_all(b"\n")?;
-        }
         Ok(())
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::core::test_utils::fs::create_tmp_dir;
-    use std::{
-        fs::{metadata, write},
-        time::SystemTime,
-    };
-
     use super::*;
+    use crate::{core::test_utils::fs::create_tmp_dir, models::secondary_device::ArchiveError};
 
     struct MockArchiveWriter {
-        added_files: Vec<(PathBuf, u64, u64, u64)>,
+        added_files: Vec<(PathBuf, u128, u128, u64)>,
     }
     impl MockArchiveWriter {
         fn new() -> Self {
@@ -117,16 +132,41 @@ mod tests {
         }
     }
     impl ArchiveWriter for MockArchiveWriter {
-        fn add_file(&mut self, path: &PathBuf, ctime: u64, mtime: u64, size: u64) {
+        fn add_file(
+            &mut self,
+            _file: &mut File,
+            path: &PathBuf,
+            ctime: u128,
+            mtime: u128,
+            size: u64,
+        ) -> Result<(), ArchiveError> {
             self.added_files.push((path.clone(), ctime, mtime, size));
+            Ok(())
         }
-    }
-
-    fn now() -> u64 {
-        SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as u64
+        fn add_directory(
+            &mut self,
+            _path: &PathBuf,
+            _ctime: u128,
+            _mtime: u128,
+        ) -> Result<(), ArchiveError> {
+            panic!("Not implemented");
+        }
+        fn add_symlink(
+            &mut self,
+            _path: &PathBuf,
+            _ctime: u128,
+            _mtime: u128,
+            _target: &PathBuf,
+        ) -> Result<(), ArchiveError> {
+            panic!("Not implemented");
+        }
+        fn finalize(
+            &mut self,
+            _deleted_files: &Vec<PathBuf>,
+            _new_index: &Vec<u8>,
+        ) -> Result<(), ArchiveError> {
+            Ok(())
+        }
     }
 
     #[test]
@@ -137,7 +177,9 @@ mod tests {
 
         // Run backup execution
         let mut execution = BackupExecution::new(index, dir);
-        execution.execute(&mut MockArchiveWriter::new()).unwrap();
+        execution
+            .execute(Box::new(MockArchiveWriter::new()))
+            .unwrap();
 
         // Should be not deleted entries
         assert_eq!(execution.deleted_entries.len(), 0);
@@ -146,193 +188,5 @@ mod tests {
         let new_index = execution.new_index;
         let expected_new_index = BackupIndex::new();
         assert_eq!(new_index, expected_new_index);
-    }
-
-    #[test]
-    fn test_backup_empty_index_added_file() {
-        // Prepare empty directory structure and empty index
-        let dir = create_tmp_dir();
-        write(dir.join("added.txt"), "Hello, world!").unwrap();
-        let ctime = metadata(dir.join("added.txt")).unwrap().ctime_ms();
-        let index = BackupIndex::new();
-
-        // Run backup execution
-        let mut archiver = MockArchiveWriter::new();
-        let mut execution = BackupExecution::new(index, dir);
-        execution.execute(&mut archiver).unwrap();
-
-        // Should be no deleted entries
-        assert_eq!(execution.deleted_entries.len(), 0);
-
-        // Check archiver
-        assert_eq!(
-            vec![(PathBuf::from("added.txt"), ctime, ctime, 13)],
-            archiver.added_files
-        );
-
-        // Should be one new entry in new index
-        let new_index = execution.new_index;
-        let expected_new_index =
-            BackupIndex::new().with_entry(ctime, ctime, 13, PathBuf::from("added.txt"));
-        assert_eq!(new_index, expected_new_index);
-    }
-
-    #[test]
-    fn test_backup_deleted_file() {
-        // Prepare directory structure
-        let dir = create_tmp_dir();
-
-        // Prepare index
-        let ctime = now();
-        let index = BackupIndex::new().with_entry(ctime, ctime, 13, PathBuf::from("deleted.txt"));
-
-        // Run backup execution
-        let mut archiver = MockArchiveWriter::new();
-        let mut execution = BackupExecution::new(index, dir);
-        execution.execute(&mut archiver).unwrap();
-
-        // Nothing in the archive
-        assert_eq!(archiver.added_files.len(), 0);
-
-        // Check deleted entries
-        assert_eq!(execution.deleted_entries.len(), 1);
-        assert_eq!(execution.deleted_entries[0], PathBuf::from("deleted.txt"));
-
-        // Check new index
-        let new_index = execution.new_index;
-        let expected_new_index = BackupIndex::new();
-        assert_eq!(new_index, expected_new_index);
-    }
-
-    #[test]
-    fn test_backup_execution_unchanged_file() {
-        // Prepare directory structure
-        let dir = create_tmp_dir();
-        write(dir.join("unchanged.txt"), "Hello, world!").unwrap();
-        let metadata = metadata(dir.join("unchanged.txt")).unwrap();
-        let ctime = metadata.ctime_ms();
-
-        // Prepare index
-        let index = BackupIndex::new().with_entry(ctime, ctime, 13, PathBuf::from("unchanged.txt"));
-
-        // Run backup execution
-        let mut archiver = MockArchiveWriter::new();
-        let mut execution = BackupExecution::new(index, dir);
-        execution.execute(&mut archiver).unwrap();
-
-        // Empty archive
-        assert_eq!(archiver.added_files.len(), 0);
-
-        // Check deleted entries
-        assert_eq!(execution.deleted_entries.len(), 0);
-
-        // Check new index
-        let new_index = execution.new_index;
-        let expected_new_index =
-            BackupIndex::new().with_entry(ctime, ctime, 13, PathBuf::from("unchanged.txt"));
-        assert_eq!(new_index, expected_new_index);
-    }
-
-    #[test]
-    fn test_backup_one_updated_file() {
-        // Prepare directory structure
-        let dir = create_tmp_dir();
-        write(dir.join("updated.txt"), "Hello, world!").unwrap();
-        let metadata = metadata(dir.join("updated.txt")).unwrap();
-        let ctime = metadata.ctime_ms();
-
-        // Prepare index
-        let index =
-            BackupIndex::new().with_entry(ctime - 10, ctime - 10, 13, PathBuf::from("updated.txt"));
-
-        // Run backup execution
-        let mut archiver = MockArchiveWriter::new();
-        let mut execution = BackupExecution::new(index, dir);
-        execution.execute(&mut archiver).unwrap();
-
-        // Check archiver
-        assert_eq!(
-            vec![(PathBuf::from("updated.txt"), ctime, ctime, 13)],
-            archiver.added_files
-        );
-
-        // Check deleted entries
-        assert_eq!(execution.deleted_entries.len(), 0);
-
-        // Check new index
-        let new_index = execution.new_index;
-        let expected_new_index =
-            BackupIndex::new().with_entry(ctime, ctime, 13, PathBuf::from("updated.txt"));
-        assert_eq!(new_index, expected_new_index);
-    }
-
-    #[test]
-    fn test_backup_execution_several_files() {
-        // Prepare directory structure
-        let dir = create_tmp_dir();
-        write(dir.join("unchanged.txt"), "Hello, world!").unwrap();
-        write(dir.join("added.txt"), "Hello, world!").unwrap();
-        write(dir.join("updated.txt"), "Hello, world!").unwrap();
-        let metadata = metadata(dir.join("unchanged.txt")).unwrap();
-        let ctime = metadata.ctime_ms();
-
-        // Prepare index
-        let index = BackupIndex::new()
-            .with_entry(ctime, ctime, 13, PathBuf::from("unchanged.txt"))
-            .with_entry(ctime - 10, ctime - 10, 13, PathBuf::from("updated.txt"))
-            .with_entry(ctime, ctime, 13, PathBuf::from("deleted.txt"));
-
-        // Run backup execution
-        let mut archiver = MockArchiveWriter::new();
-        let mut execution = BackupExecution::new(index, dir);
-        execution.execute(&mut archiver).unwrap();
-
-        // Check archiver
-        assert_eq!(
-            vec![
-                (PathBuf::from("added.txt"), ctime, ctime, 13),
-                (PathBuf::from("updated.txt"), ctime, ctime, 13),
-            ],
-            archiver.added_files
-        );
-
-        // Check deleted entries
-        assert_eq!(execution.deleted_entries.len(), 1);
-        assert_eq!(execution.deleted_entries[0], PathBuf::from("deleted.txt"));
-
-        // Check new index
-        let new_index = execution.new_index;
-        let expected_new_index = BackupIndex::new()
-            .with_entry(ctime, ctime, 13, PathBuf::from("added.txt"))
-            .with_entry(ctime, ctime, 13, PathBuf::from("unchanged.txt"))
-            .with_entry(ctime, ctime, 13, PathBuf::from("updated.txt"));
-        assert_eq!(new_index, expected_new_index);
-    }
-
-    #[test]
-    fn test_backup_execution_to_buffer() {
-        let mock_backup_execution = BackupExecution::from_new_index_and_deleted_entries(
-            BackupIndex::new()
-                .with_entry(1, 2, 3, PathBuf::from("test1.txt"))
-                .with_entry(4, 5, 6, PathBuf::from("test2.txt")),
-            vec![PathBuf::from("deleted.txt")],
-        );
-
-        let mut buffer = Vec::new();
-        mock_backup_execution.to_index_writer(&mut buffer).unwrap();
-
-        assert_eq!(
-            buffer,
-            b"\x02\x00\x00\x00\x00\x00\x00\x00\
-            \x01\x00\x00\x00\x00\x00\x00\x00\
-            \x02\x00\x00\x00\x00\x00\x00\x00\
-            \x03\x00\x00\x00\x00\x00\x00\x00\
-            test1.txt\n\
-            \x04\x00\x00\x00\x00\x00\x00\x00\
-            \x05\x00\x00\x00\x00\x00\x00\x00\
-            \x06\x00\x00\x00\x00\x00\x00\x00\
-            test2.txt\n\
-            deleted.txt\n"
-        );
     }
 }

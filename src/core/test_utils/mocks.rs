@@ -1,10 +1,10 @@
-use std::time::Instant;
+use std::{io::BufRead, time::Instant};
 
 use crate::{
     adapters::primary_device::MockGlobalConfigProvider,
     models::{
         backup_requirement::SecurityLevel,
-        secondary_device::{Device, DeviceFactory},
+        secondary_device::{ArchiveWriter, Device, DeviceFactory},
     },
 };
 
@@ -77,6 +77,15 @@ impl Device for MockDeviceWithParameters {
         table.insert("parameter".to_string(), self.parameter.clone().into());
         table
     }
+    fn read_backup_index(&self, _project_name: &str) -> Result<Option<Box<dyn BufRead>>, String> {
+        Ok(None)
+    }
+    fn test_availability(&self) -> Result<(), String> {
+        Ok(())
+    }
+    fn get_archive_writer(&self, _project_name: &str) -> Box<dyn ArchiveWriter> {
+        panic!("Mock not implemented for this use case")
+    }
 }
 impl DeviceFactory for MockDeviceWithParametersFactory {
     fn get_question_statement(&self) -> &str {
@@ -145,6 +154,15 @@ impl Device for MockDevice {
         table.insert("name".to_string(), self.get_name().into());
         table.insert("type".to_string(), self.get_device_type_name().into());
         table
+    }
+    fn read_backup_index(&self, _project_name: &str) -> Result<Option<Box<dyn BufRead>>, String> {
+        Ok(None)
+    }
+    fn test_availability(&self) -> Result<(), String> {
+        Ok(())
+    }
+    fn get_archive_writer(&self, _project_name: &str) -> Box<dyn ArchiveWriter> {
+        panic!("Mock not implemented for this use case")
     }
 }
 

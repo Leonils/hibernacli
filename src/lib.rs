@@ -13,13 +13,13 @@ mod core {
     }
 
     mod backup {
-        mod backup_execution;
-        mod backup_index;
+        pub mod backup_execution;
+        pub mod backup_index;
     }
 
-    mod util {
+    pub mod util {
         pub mod buffer_ext;
-        pub mod metadata;
+        pub mod timestamps;
     }
 
     mod backup_exploration;
