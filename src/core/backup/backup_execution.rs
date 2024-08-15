@@ -76,7 +76,10 @@ impl BackupExecution {
     ) -> Result<(), BackupExecutionError> {
         // Walk through the folder at root_path, and mark visited entries
         // in the index
-        for entry in WalkDir::new(&self.root_path).min_depth(1) {
+        for entry in WalkDir::new(&self.root_path)
+            .min_depth(1)
+            .sort_by(|a, b| a.file_name().cmp(b.file_name()))
+        {
             let entry = entry?;
             let path_relative_to_root = entry.path().strip_prefix(&self.root_path)?;
             let metadata = entry.metadata()?;
