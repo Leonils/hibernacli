@@ -99,7 +99,7 @@ impl MountedFolderArchiveWriter {
         let now = now!()
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap() // we are after 1970, this should never fail
-            .as_secs();
+            .as_millis();
         let project_dir = Path::join(&path, &project_name);
         let archive_path = Path::join(&project_dir, format!("{}.tar", now));
 
@@ -210,7 +210,7 @@ impl ArchiveWriter for MountedFolderArchiveWriter {
 
         // Open the archive and a gzip file to compress it (just add .gz to the file name)
         let tar_file = File::open(&self.archive_path).unwrap();
-        let mut gz_file = File::create(&format!("{}.gz", self.archive_path.display())).unwrap();
+        let gz_file = File::create(&format!("{}.gz", self.archive_path.display())).unwrap();
 
         // Compress the archive
         let tar_file_size = tar_file.metadata().unwrap().len();
