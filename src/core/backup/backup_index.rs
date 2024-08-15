@@ -167,8 +167,8 @@ mod tests {
     fn test_read_from_single_line_file() {
         // Create a buffer with a single line
         let mut buffer = Vec::new();
-        buffer.extend_from_slice(&u64::to_le_bytes(1));
-        buffer.extend_from_slice(&u64::to_le_bytes(2));
+        buffer.extend_from_slice(&u128::to_le_bytes(1));
+        buffer.extend_from_slice(&u128::to_le_bytes(2));
         buffer.extend_from_slice(&u64::to_le_bytes(3));
         buffer.extend_from_slice(b"test.txt\n");
 
@@ -197,8 +197,8 @@ mod tests {
 
         assert_eq!(
             buffer,
-            b"\x01\x00\x00\x00\x00\x00\x00\x00\
-            \x02\x00\x00\x00\x00\x00\x00\x00\
+            b"\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\
+            \x02\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\
             \x03\x00\x00\x00\x00\x00\x00\x00\
             test.txt\n"
         );

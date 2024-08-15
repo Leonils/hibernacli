@@ -138,9 +138,7 @@ mod tests {
         fn add_symlink(&mut self, _path: &PathBuf, _ctime: u128, _mtime: u128, _target: &PathBuf) {
             panic!("Not implemented");
         }
-        fn finalize(&mut self, _deleted_files: &Vec<PathBuf>, _new_index: &Vec<u8>) {
-            panic!("Not implemented");
-        }
+        fn finalize(&mut self, _deleted_files: &Vec<PathBuf>, _new_index: &Vec<u8>) {}
     }
 
     #[test]
