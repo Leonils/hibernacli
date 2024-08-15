@@ -1,3 +1,5 @@
+use flate2::write::GzEncoder;
+
 use crate::{
     models::{
         backup_requirement::SecurityLevel,
@@ -8,7 +10,7 @@ use crate::{
 };
 use std::{
     fs::File,
-    io::{BufRead, Cursor},
+    io::{self, BufRead, Cursor, Read},
     path::PathBuf,
     time::Instant,
 };
@@ -194,13 +196,30 @@ impl ArchiveWriter for MountedFolderArchiveWriter {
             .collect::<Vec<_>>()
             .join("\n");
         let deleted_files_data = deleted_files_data.as_bytes();
-
         self.add_file_from_bytes(deleted_files_data, Path::new(".deleted-files"));
+
+        // Add a copy of the new index in the archive
         self.add_file_from_bytes(&new_index, Path::new(".index"));
 
-        // Add the new index next to the archive
+        // Save the index for quick access to the latest version
         let current_index_path = Path::join(&self.project_dir, "current.index");
         std::fs::write(&current_index_path, new_index).unwrap();
+
+        // End the archive
+        self.tar_builder.as_mut().unwrap().finish().unwrap();
+
+        // Open the archive and a gzip file to compress it (just add .gz to the file name)
+        let tar_file = File::open(&self.archive_path).unwrap();
+        let mut gz_file = File::create(&format!("{}.gz", self.archive_path.display())).unwrap();
+
+        // Compress the archive
+        let tar_file_size = tar_file.metadata().unwrap().len();
+        let mut encoder = GzEncoder::new(gz_file, flate2::Compression::default());
+        io::copy(&mut tar_file.take(tar_file_size), &mut encoder).unwrap();
+        encoder.finish().unwrap();
+
+        // Remove the uncompressed archive
+        std::fs::remove_file(&self.archive_path).unwrap();
     }
 }
 
