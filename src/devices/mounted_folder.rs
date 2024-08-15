@@ -6,12 +6,23 @@ use crate::{
     },
     now,
 };
-use std::{fs::File, io::BufRead, path::PathBuf, time::Instant};
+use std::{
+    fs::File,
+    io::{BufRead, Cursor},
+    path::PathBuf,
+    time::Instant,
+};
 use std::{path::Path, time::SystemTime};
 
 struct MountedFolder {
     name: Option<String>,
     path: PathBuf,
+}
+
+impl MountedFolder {
+    fn get_project_path(&self, project_name: &str) -> PathBuf {
+        Path::join(&self.path, &project_name)
+    }
 }
 
 impl Device for MountedFolder {
@@ -50,8 +61,16 @@ impl Device for MountedFolder {
         table
     }
 
-    fn read_backup_index(&self, _project_name: &str) -> Result<Option<Box<dyn BufRead>>, String> {
-        Ok(None)
+    fn read_backup_index(&self, project_name: &str) -> Result<Option<Box<dyn BufRead>>, String> {
+        let index_path = Path::join(&self.get_project_path(project_name), "current.index");
+
+        match std::fs::read(&index_path) {
+            Ok(data) => Ok(Some(Box::new(Cursor::new(data)))),
+            Err(e) => match e.kind() {
+                std::io::ErrorKind::NotFound => Ok(None),
+                _ => Err(e.to_string()),
+            },
+        }
     }
 
     fn test_availability(&self) -> Result<(), String> {
