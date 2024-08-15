@@ -58,10 +58,10 @@ impl Device for MountedFolder {
         self.path.read_dir().map(|_| ()).map_err(|e| e.to_string())
     }
 
-    fn get_archive_writer(&self) -> Box<dyn ArchiveWriter> {
+    fn get_archive_writer(&self, project_name: &str) -> Box<dyn ArchiveWriter> {
         Box::new(MountedFolderArchiveWriter::new(
             self.path.clone(),
-            self.get_name(),
+            project_name.to_string(),
         ))
     }
 }

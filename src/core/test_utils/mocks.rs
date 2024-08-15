@@ -4,7 +4,7 @@ use crate::{
     adapters::primary_device::MockGlobalConfigProvider,
     models::{
         backup_requirement::SecurityLevel,
-        secondary_device::{Device, DeviceFactory},
+        secondary_device::{ArchiveWriter, Device, DeviceFactory},
     },
 };
 
@@ -83,7 +83,7 @@ impl Device for MockDeviceWithParameters {
     fn test_availability(&self) -> Result<(), String> {
         Ok(())
     }
-    fn get_archive_writer(&self) -> Box<dyn crate::models::secondary_device::ArchiveWriter> {
+    fn get_archive_writer(&self, _project_name: &str) -> Box<dyn ArchiveWriter> {
         panic!("Mock not implemented for this use case")
     }
 }
@@ -161,7 +161,7 @@ impl Device for MockDevice {
     fn test_availability(&self) -> Result<(), String> {
         Ok(())
     }
-    fn get_archive_writer(&self) -> Box<dyn crate::models::secondary_device::ArchiveWriter> {
+    fn get_archive_writer(&self, _project_name: &str) -> Box<dyn ArchiveWriter> {
         panic!("Mock not implemented for this use case")
     }
 }

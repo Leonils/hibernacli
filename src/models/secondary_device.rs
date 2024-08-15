@@ -41,7 +41,7 @@ pub trait Device {
     fn test_availability(&self) -> Result<(), String>;
 
     // Get the archive writer for the device
-    fn get_archive_writer(&self) -> Box<dyn ArchiveWriter>;
+    fn get_archive_writer(&self, project_name: &str) -> Box<dyn ArchiveWriter>;
 }
 
 pub trait ArchiveWriter {
