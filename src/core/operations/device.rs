@@ -1,6 +1,6 @@
 use crate::{
     adapters::operations::device::DeviceOperations,
-    core::global_config::GlobalConfig,
+    core::config::GlobalConfig,
     models::secondary_device::{Device, DeviceFactory, DeviceFactoryKey},
 };
 

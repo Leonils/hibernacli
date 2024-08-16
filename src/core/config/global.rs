@@ -3,15 +3,13 @@ use toml::Table;
 
 use crate::{
     adapters::primary_device::GlobalConfigProvider,
+    core::device_factories_registry::DeviceFactoryRegistry,
     models::{project::Project, secondary_device::Device},
 };
 
 use super::{
-    config::{
-        from_toml::{parse_toml_global_config, ParseTomlResult},
-        to_toml::ToToml,
-    },
-    device_factories_registry::DeviceFactoryRegistry,
+    from_toml::{parse_toml_global_config, ParseTomlResult},
+    to_toml::ToToml,
 };
 
 pub struct GlobalConfig {

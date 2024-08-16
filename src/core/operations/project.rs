@@ -1,6 +1,6 @@
 use crate::{
     adapters::operations::project::{AddProjectArgs, ProjectOperations},
-    core::global_config::GlobalConfig,
+    core::config::GlobalConfig,
     models::{
         backup_requirement::BackupRequirementClass,
         project::{Project, ProjectTrackingStatus},

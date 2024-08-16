@@ -4,7 +4,7 @@ use crate::{
     adapters::operations::backup::BackupOperations,
     core::{
         backup::{backup_execution::BackupExecution, backup_index::BackupIndex},
-        global_config::GlobalConfig,
+        config::GlobalConfig,
     },
 };
 

@@ -7,9 +7,13 @@ mod core {
     }
 
     mod config {
-        pub mod from_toml;
-        pub mod to_toml;
-        pub mod toml_try_read;
+        mod from_toml;
+        mod global;
+        mod project;
+        mod to_toml;
+        mod toml_try_read;
+
+        pub use global::GlobalConfig;
     }
 
     mod backup {
@@ -24,9 +28,7 @@ mod core {
 
     mod backup_exploration;
     mod device_factories_registry;
-    mod global_config;
     pub mod operations;
-    mod project_config;
     mod project_status;
     mod projects_scan;
     mod restore_execution;
