@@ -6,12 +6,8 @@ mod core {
         pub mod mocks;
     }
 
+    mod backup;
     mod config;
-
-    mod backup {
-        pub mod backup_execution;
-        pub mod backup_index;
-    }
 
     pub mod util {
         pub mod buffer_ext;
@@ -24,6 +20,8 @@ mod core {
     mod project_status;
     mod projects_scan;
     mod restore_execution;
+
+    pub use config::GlobalConfigProvider;
 }
 
 // Public structures (low behavior, high data)
@@ -32,13 +30,6 @@ mod models {
     pub mod project;
     pub mod question;
     pub mod secondary_device;
-}
-
-// Adapters (interfaces implemented by core)
-pub mod adapters {
-    pub mod operations;
-    pub mod primary_device;
-    mod secondary_device;
 }
 
 mod devices {

@@ -1,7 +1,6 @@
 use itertools::Itertools;
 
 use crate::{
-    adapters::primary_device::GlobalConfigProvider,
     core::device_factories_registry::DeviceFactoryRegistry,
     models::{project::Project, secondary_device::Device},
 };
@@ -9,7 +8,7 @@ use crate::{
 use super::super::{
     from_toml::{parse_toml_global_config, ParseTomlResult},
     to_toml::ToToml,
-    GlobalConfig,
+    GlobalConfig, GlobalConfigProvider,
 };
 
 impl GlobalConfig {
@@ -117,7 +116,6 @@ mod tests {
     use mockall::predicate::eq;
 
     use crate::{
-        adapters::primary_device::MockGlobalConfigProvider,
         core::test_utils::mocks::{
             MockDevice, MockDeviceFactory, MockDeviceWithParameters,
             MockDeviceWithParametersFactory, MockGlobalConfigProviderFactory,
@@ -125,6 +123,7 @@ mod tests {
         models::{backup_requirement::SecurityLevel, project::ProjectTrackingStatus},
     };
 
+    use super::super::super::MockGlobalConfigProvider;
     use super::*;
 
     fn get_mock_device_factory_registry() -> DeviceFactoryRegistry {

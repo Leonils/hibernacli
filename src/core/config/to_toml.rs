@@ -173,8 +173,7 @@ impl ToToml for Project {
 mod tests {
     use std::time::SystemTime;
 
-    use crate::adapters::primary_device::MockGlobalConfigProvider;
-    use crate::core::config::GlobalConfig;
+    use crate::core::config::{GlobalConfig, MockGlobalConfigProvider};
     use crate::core::test_utils::mocks::{MockDevice, MockDeviceFactory, MockDeviceWithParameters};
     use crate::models::secondary_device::DeviceFactory;
     use mockall::predicate::eq;

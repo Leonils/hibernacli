@@ -1,14 +1,11 @@
 use std::path::PathBuf;
 
-use crate::{
-    adapters::operations::backup::BackupOperations,
-    core::{
-        backup::{backup_execution::BackupExecution, backup_index::BackupIndex},
-        config::GlobalConfig,
-    },
+use crate::core::{
+    backup::{BackupExecution, BackupIndex},
+    config::GlobalConfig,
 };
 
-use super::Operations;
+use super::{BackupOperations, Operations};
 
 impl BackupOperations for Operations {
     fn backup_project_to_device(

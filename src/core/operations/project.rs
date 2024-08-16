@@ -1,5 +1,4 @@
 use crate::{
-    adapters::operations::project::{AddProjectArgs, ProjectOperations},
     core::config::GlobalConfig,
     models::{
         backup_requirement::BackupRequirementClass,
@@ -9,7 +8,7 @@ use crate::{
 };
 use std::time::SystemTime;
 
-use super::Operations;
+use super::{AddProjectArgs, Operations, ProjectOperations};
 
 impl ProjectOperations for Operations {
     fn add_project(&self, args: AddProjectArgs) -> Result<(), String> {
@@ -63,8 +62,8 @@ mod tests {
 
     use super::*;
     use crate::{
-        adapters::primary_device::MockGlobalConfigProvider,
         core::{
+            config::MockGlobalConfigProvider,
             device_factories_registry::DeviceFactoryRegistry,
             operations::Operations,
             test_utils::mocks::{MockDeviceFactory, MockGlobalConfigProviderFactory},

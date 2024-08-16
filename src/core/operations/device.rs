@@ -1,10 +1,9 @@
 use crate::{
-    adapters::operations::device::DeviceOperations,
     core::config::GlobalConfig,
     models::secondary_device::{Device, DeviceFactory, DeviceFactoryKey},
 };
 
-use super::Operations;
+use super::{DeviceOperations, Operations};
 
 impl DeviceOperations for Operations {
     fn get_available_device_factories(&self) -> Vec<DeviceFactoryKey> {
@@ -52,12 +51,10 @@ impl DeviceOperations for Operations {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        adapters::primary_device::MockGlobalConfigProvider,
-        core::{
-            device_factories_registry::DeviceFactoryRegistry,
-            test_utils::mocks::{MockDevice, MockDeviceFactory, MockGlobalConfigProviderFactory},
-        },
+    use crate::core::{
+        config::MockGlobalConfigProvider,
+        device_factories_registry::DeviceFactoryRegistry,
+        test_utils::mocks::{MockDevice, MockDeviceFactory, MockGlobalConfigProviderFactory},
     };
 
     use super::*;

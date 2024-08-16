@@ -1,7 +1,7 @@
 use std::{io::BufRead, time::Instant};
 
 use crate::{
-    adapters::primary_device::MockGlobalConfigProvider,
+    core::config::MockGlobalConfigProvider,
     models::{
         backup_requirement::SecurityLevel,
         secondary_device::{ArchiveWriter, Device, DeviceFactory},

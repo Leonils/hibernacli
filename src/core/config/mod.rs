@@ -1,5 +1,8 @@
 use crate::models::{project::Project, secondary_device::Device};
 
+#[cfg(test)]
+use mockall::automock;
+
 mod from_toml;
 mod global {
     mod devices;
@@ -20,4 +23,11 @@ impl GlobalConfig {
     pub fn new(devices: Vec<Box<dyn Device>>, projects: Vec<Project>) -> Self {
         Self { devices, projects }
     }
+}
+
+#[cfg_attr(test, automock)]
+pub trait GlobalConfigProvider {
+    fn init_global_config(&self) -> Result<(), String>;
+    fn read_global_config(&self) -> Result<String, String>;
+    fn write_global_config(&self, content: &str) -> Result<(), String>;
 }
