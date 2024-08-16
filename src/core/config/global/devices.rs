@@ -1,5 +1,6 @@
+use crate::core::device::Device;
+
 use super::super::GlobalConfig;
-use crate::models::secondary_device::Device;
 
 impl GlobalConfig {
     pub fn get_device_by_name(&self, name: &str) -> Option<&Box<dyn Device>> {
@@ -41,9 +42,9 @@ impl GlobalConfig {
 #[cfg(test)]
 mod tests {
 
-    use crate::{
-        core::test_utils::mocks::{MockDevice, MockDeviceFactory},
-        models::secondary_device::DeviceFactory,
+    use crate::core::{
+        test_utils::mocks::{MockDevice, MockDeviceFactory},
+        DeviceFactory,
     };
 
     use super::GlobalConfig;

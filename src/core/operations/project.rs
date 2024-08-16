@@ -1,7 +1,7 @@
 use crate::{
-    core::config::GlobalConfig,
-    models::{
-        backup_requirement::BackupRequirementClass,
+    core::{
+        config::GlobalConfig,
+        device::BackupRequirementClass,
         project::{Project, ProjectTrackingStatus},
     },
     now,
@@ -61,14 +61,13 @@ mod tests {
     use mockall::predicate::eq;
 
     use super::*;
-    use crate::{
-        core::{
-            config::MockGlobalConfigProvider,
-            device_factories_registry::DeviceFactoryRegistry,
-            operations::Operations,
-            test_utils::mocks::{MockDeviceFactory, MockGlobalConfigProviderFactory},
-        },
-        models::backup_requirement::SecurityLevel,
+    use crate::core::{
+        config::MockGlobalConfigProvider,
+        device::DeviceFactoryRegistry,
+        operations::Operations,
+        project::ProjectTrackingStatus,
+        test_utils::mocks::{MockDeviceFactory, MockGlobalConfigProviderFactory},
+        SecurityLevel,
     };
 
     #[test]

@@ -2,8 +2,8 @@ use std::time::UNIX_EPOCH;
 
 use toml::Table;
 
-use crate::models::{
-    backup_requirement::BackupRequirementClass,
+use crate::core::{
+    device::BackupRequirementClass,
     project::{Project, ProjectTrackingStatus},
 };
 
@@ -175,7 +175,7 @@ mod tests {
 
     use crate::core::config::{GlobalConfig, MockGlobalConfigProvider};
     use crate::core::test_utils::mocks::{MockDevice, MockDeviceFactory, MockDeviceWithParameters};
-    use crate::models::secondary_device::DeviceFactory;
+    use crate::core::DeviceFactory;
     use mockall::predicate::eq;
 
     use super::*;

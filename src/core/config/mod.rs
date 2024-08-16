@@ -1,7 +1,7 @@
-use crate::models::{project::Project, secondary_device::Device};
-
 #[cfg(test)]
 use mockall::automock;
+
+use super::{project::Project, Device};
 
 mod from_toml;
 mod global {

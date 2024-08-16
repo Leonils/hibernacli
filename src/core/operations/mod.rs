@@ -1,12 +1,10 @@
-use crate::models::{
-    project::Project,
-    secondary_device::{Device, DeviceFactory, DeviceFactoryKey},
-};
-
-use super::{config::GlobalConfigProvider, device_factories_registry::DeviceFactoryRegistry};
-
 #[cfg(test)]
 use super::config::MockGlobalConfigProvider;
+use super::{
+    device::{Device, DeviceFactory, DeviceFactoryKey, DeviceFactoryRegistry},
+    project::Project,
+    GlobalConfigProvider,
+};
 
 #[cfg(test)]
 use mockall::automock;

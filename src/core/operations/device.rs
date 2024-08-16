@@ -1,6 +1,6 @@
-use crate::{
-    core::config::GlobalConfig,
-    models::secondary_device::{Device, DeviceFactory, DeviceFactoryKey},
+use crate::core::{
+    config::GlobalConfig,
+    device::{Device, DeviceFactory, DeviceFactoryKey},
 };
 
 use super::{DeviceOperations, Operations};
@@ -53,7 +53,7 @@ impl DeviceOperations for Operations {
 mod tests {
     use crate::core::{
         config::MockGlobalConfigProvider,
-        device_factories_registry::DeviceFactoryRegistry,
+        device::DeviceFactoryRegistry,
         test_utils::mocks::{MockDevice, MockDeviceFactory, MockGlobalConfigProviderFactory},
     };
 

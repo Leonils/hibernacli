@@ -1,5 +1,5 @@
 use super::super::GlobalConfig;
-use crate::models::project::Project;
+use crate::core::project::Project;
 
 impl GlobalConfig {
     pub fn get_project_by_name(&self, name: &str) -> Option<&Project> {

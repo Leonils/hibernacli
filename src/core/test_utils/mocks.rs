@@ -1,11 +1,9 @@
 use std::{io::BufRead, time::Instant};
 
-use crate::{
-    core::config::MockGlobalConfigProvider,
-    models::{
-        backup_requirement::SecurityLevel,
-        secondary_device::{ArchiveWriter, Device, DeviceFactory},
-    },
+use crate::core::{
+    config::MockGlobalConfigProvider,
+    device::{ArchiveWriter, QuestionType},
+    Device, DeviceFactory, SecurityLevel,
 };
 
 pub struct MockDeviceFactory;
@@ -13,7 +11,7 @@ impl DeviceFactory for MockDeviceFactory {
     fn get_question_statement(&self) -> &str {
         panic!("No question")
     }
-    fn get_question_type(&self) -> &crate::models::question::QuestionType {
+    fn get_question_type(&self) -> &QuestionType {
         panic!("No question")
     }
     fn set_question_answer(&mut self, _answer: String) -> Result<(), String> {
@@ -91,7 +89,7 @@ impl DeviceFactory for MockDeviceWithParametersFactory {
     fn get_question_statement(&self) -> &str {
         panic!("No question")
     }
-    fn get_question_type(&self) -> &crate::models::question::QuestionType {
+    fn get_question_type(&self) -> &QuestionType {
         panic!("No question")
     }
     fn set_question_answer(&mut self, _answer: String) -> Result<(), String> {

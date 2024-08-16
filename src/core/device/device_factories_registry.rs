@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::models::secondary_device::{DeviceFactory, DeviceFactoryKey};
+use super::{secondary_device::DeviceFactoryKey, DeviceFactory};
 
 pub struct DeviceFactoryBox {
     name: String,

@@ -1,9 +1,9 @@
 use std::{fmt::Display, fs::File, path::PathBuf};
 use walkdir::WalkDir;
 
-use crate::{
-    core::util::timestamps::{MetadataExt, TimeStampError},
-    models::secondary_device::{ArchiveError, ArchiveWriter},
+use crate::core::{
+    device::{ArchiveError, ArchiveWriter},
+    util::timestamps::{MetadataExt, TimeStampError},
 };
 
 use super::backup_index::{BackupIndex, ToBuffer};
@@ -119,7 +119,7 @@ impl BackupExecution {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{core::test_utils::fs::create_tmp_dir, models::secondary_device::ArchiveError};
+    use crate::core::test_utils::fs::create_tmp_dir;
 
     struct MockArchiveWriter {
         added_files: Vec<(PathBuf, u128, u128, u64)>,

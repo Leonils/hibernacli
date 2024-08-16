@@ -6,30 +6,27 @@ mod core {
         pub mod mocks;
     }
 
-    mod backup;
-    mod config;
-
     pub mod util {
         pub mod buffer_ext;
         pub mod timestamps;
     }
 
-    mod backup_exploration;
-    mod device_factories_registry;
+    mod backup;
+    mod config;
+    mod device;
+    mod project;
+
     pub mod operations;
-    mod project_status;
-    mod projects_scan;
-    mod restore_execution;
 
     pub use config::GlobalConfigProvider;
-}
+    pub use device::SecurityLevel;
+    pub use device::{
+        ArchiveError, ArchiveWriter, Device, DeviceFactory, DeviceFactoryKey, Question,
+        QuestionType,
+    };
 
-// Public structures (low behavior, high data)
-mod models {
-    pub mod backup_requirement;
-    pub mod project;
-    pub mod question;
-    pub mod secondary_device;
+    #[cfg(test)]
+    pub use device::{MockDevice, MockDeviceFactory};
 }
 
 mod devices {

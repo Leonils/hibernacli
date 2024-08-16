@@ -1,11 +1,9 @@
 use flate2::write::GzEncoder;
 
 use crate::{
-    core::util::timestamps::Timestamp,
-    models::{
-        backup_requirement::SecurityLevel,
-        question::{Question, QuestionType},
-        secondary_device::{ArchiveError, ArchiveWriter, Device, DeviceFactory},
+    core::{
+        util::timestamps::Timestamp, ArchiveError, ArchiveWriter, Device, DeviceFactory, Question,
+        QuestionType, SecurityLevel,
     },
     now,
 };

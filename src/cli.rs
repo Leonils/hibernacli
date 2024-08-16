@@ -1,11 +1,10 @@
 #[cfg(test)]
 use mockall::automock;
 
-use crate::core::operations::{
-    AddProjectArgs, BackupOperations, DeviceOperations, ProjectOperations,
+use crate::core::{
+    operations::{AddProjectArgs, BackupOperations, DeviceOperations, ProjectOperations},
+    DeviceFactoryKey, QuestionType,
 };
-use crate::models::question::QuestionType;
-use crate::models::secondary_device::DeviceFactoryKey;
 
 const HELP: &str = r#"
 HibernaCLI
@@ -313,9 +312,9 @@ impl<'a, T: UserInterface, U: DeviceOperations, V: ProjectOperations, W: BackupO
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        core::operations::{MockBackupOperations, MockDeviceOperations, MockProjectOperations},
-        models::secondary_device::{MockDevice, MockDeviceFactory},
+    use crate::core::{
+        operations::{MockBackupOperations, MockDeviceOperations, MockProjectOperations},
+        MockDevice, MockDeviceFactory,
     };
     use mockall::predicate::eq;
 

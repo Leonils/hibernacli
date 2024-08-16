@@ -1,10 +1,7 @@
 use itertools::Itertools;
 use toml::Table;
 
-use crate::{
-    core::device_factories_registry::DeviceFactoryRegistry,
-    models::{project::Project, secondary_device::Device},
-};
+use crate::core::{device::DeviceFactoryRegistry, project::Project, Device};
 
 use super::toml_try_read::TryRead;
 

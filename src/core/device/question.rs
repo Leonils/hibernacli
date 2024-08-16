@@ -57,7 +57,7 @@ impl Question {
 
 #[cfg(test)]
 mod tests {
-    use crate::models::question::{Question, QuestionType};
+    use super::*;
 
     #[test]
     fn test_create_a_question_with_a_statement_and_retrieve_it() {

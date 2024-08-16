@@ -1,8 +1,8 @@
 use itertools::Itertools;
 
-use crate::{
-    core::device_factories_registry::DeviceFactoryRegistry,
-    models::{project::Project, secondary_device::Device},
+use crate::core::{
+    device::{Device, DeviceFactoryRegistry},
+    project::Project,
 };
 
 use super::super::{
@@ -115,13 +115,12 @@ impl GlobalConfig {
 mod tests {
     use mockall::predicate::eq;
 
-    use crate::{
-        core::test_utils::mocks::{
-            MockDevice, MockDeviceFactory, MockDeviceWithParameters,
-            MockDeviceWithParametersFactory, MockGlobalConfigProviderFactory,
-        },
-        models::{backup_requirement::SecurityLevel, project::ProjectTrackingStatus},
+    use crate::core::project::ProjectTrackingStatus;
+    use crate::core::test_utils::mocks::{
+        MockDevice, MockDeviceFactory, MockDeviceWithParameters, MockDeviceWithParametersFactory,
+        MockGlobalConfigProviderFactory,
     };
+    use crate::core::SecurityLevel;
 
     use super::super::super::MockGlobalConfigProvider;
     use super::*;
