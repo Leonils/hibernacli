@@ -6,15 +6,7 @@ mod core {
         pub mod mocks;
     }
 
-    mod config {
-        mod from_toml;
-        mod global;
-        mod project;
-        mod to_toml;
-        mod toml_try_read;
-
-        pub use global::GlobalConfig;
-    }
+    mod config;
 
     mod backup {
         pub mod backup_execution;

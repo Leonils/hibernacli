@@ -7,7 +7,7 @@ use crate::models::{
     project::{Project, ProjectTrackingStatus},
 };
 
-use super::global::GlobalConfig;
+use super::GlobalConfig;
 
 #[derive(serde::Deserialize, serde::Serialize, Debug, Default)]
 struct PartiallyParsedGlobalConfig {
@@ -174,7 +174,7 @@ mod tests {
     use std::time::SystemTime;
 
     use crate::adapters::primary_device::MockGlobalConfigProvider;
-    use crate::core::config::global::GlobalConfig;
+    use crate::core::config::GlobalConfig;
     use crate::core::test_utils::mocks::{MockDevice, MockDeviceFactory, MockDeviceWithParameters};
     use crate::models::secondary_device::DeviceFactory;
     use mockall::predicate::eq;
