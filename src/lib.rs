@@ -21,8 +21,8 @@ mod core {
     pub use config::GlobalConfigProvider;
     pub use device::SecurityLevel;
     pub use device::{
-        ArchiveError, ArchiveWriter, Device, DeviceFactory, DeviceFactoryKey, Question,
-        QuestionType,
+        ArchiveError, ArchiveWriter, Device, DeviceFactory, DeviceFactoryKey,
+        DifferentialArchiveStep, Extractor, Question, QuestionType,
     };
 
     #[cfg(test)]

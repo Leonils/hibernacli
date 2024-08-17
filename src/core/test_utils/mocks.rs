@@ -3,7 +3,7 @@ use std::{io::BufRead, time::Instant};
 use crate::core::{
     config::MockGlobalConfigProvider,
     device::{ArchiveWriter, QuestionType},
-    Device, DeviceFactory, SecurityLevel,
+    Device, DeviceFactory, Extractor, SecurityLevel,
 };
 
 pub struct MockDeviceFactory;
@@ -84,6 +84,9 @@ impl Device for MockDeviceWithParameters {
     fn get_archive_writer(&self, _project_name: &str) -> Box<dyn ArchiveWriter> {
         panic!("Mock not implemented for this use case")
     }
+    fn get_extractor(&self, _project_name: &str) -> Box<dyn Extractor> {
+        panic!("Mock not implemented for this use case")
+    }
 }
 impl DeviceFactory for MockDeviceWithParametersFactory {
     fn get_question_statement(&self) -> &str {
@@ -160,6 +163,9 @@ impl Device for MockDevice {
         Ok(())
     }
     fn get_archive_writer(&self, _project_name: &str) -> Box<dyn ArchiveWriter> {
+        panic!("Mock not implemented for this use case")
+    }
+    fn get_extractor(&self, project_name: &str) -> Box<dyn Extractor> {
         panic!("Mock not implemented for this use case")
     }
 }

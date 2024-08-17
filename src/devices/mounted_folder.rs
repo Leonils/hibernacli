@@ -2,8 +2,8 @@ use flate2::write::GzEncoder;
 
 use crate::{
     core::{
-        util::timestamps::Timestamp, ArchiveError, ArchiveWriter, Device, DeviceFactory, Question,
-        QuestionType, SecurityLevel,
+        util::timestamps::Timestamp, ArchiveError, ArchiveWriter, Device, DeviceFactory,
+        DifferentialArchiveStep, Extractor, Question, QuestionType, SecurityLevel,
     },
     now,
 };
@@ -79,6 +79,13 @@ impl Device for MountedFolder {
 
     fn get_archive_writer(&self, project_name: &str) -> Box<dyn ArchiveWriter> {
         Box::new(MountedFolderArchiveWriter::new(
+            self.path.clone(),
+            project_name.to_string(),
+        ))
+    }
+
+    fn get_extractor(&self, project_name: &str) -> Box<dyn Extractor> {
+        Box::new(MountedFolderExtractor::new(
             self.path.clone(),
             project_name.to_string(),
         ))
@@ -252,6 +259,38 @@ impl ArchiveWriter for MountedFolderArchiveWriter {
         std::fs::remove_file(&self.archive_path)?;
         self.finalized = true;
         Ok(())
+    }
+}
+
+pub struct MountedFolderExtractor {}
+
+impl MountedFolderExtractor {
+    pub fn new(_path: PathBuf, _project_name: String) -> MountedFolderExtractor {
+        MountedFolderExtractor {}
+    }
+}
+
+impl Iterator for MountedFolderExtractor {
+    type Item = Box<dyn DifferentialArchiveStep>;
+
+    fn next(&mut self) -> Option<Box<dyn DifferentialArchiveStep>> {
+        None
+    }
+}
+
+impl DoubleEndedIterator for MountedFolderExtractor {
+    fn next_back(&mut self) -> Option<Box<dyn DifferentialArchiveStep>> {
+        None
+    }
+}
+
+impl Extractor for MountedFolderExtractor {}
+
+pub struct MountedFolderDifferentialArchiveStep {}
+
+impl DifferentialArchiveStep for MountedFolderDifferentialArchiveStep {
+    fn get_step_name(&self) -> &str {
+        "MountedFolderDifferentialArchiveStep"
     }
 }
 
