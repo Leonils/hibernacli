@@ -1,6 +1,7 @@
-use crate::adapters::primary_device::GlobalConfigProvider;
 use directories::ProjectDirs;
 use std::path::{Path, PathBuf};
+
+use crate::core::GlobalConfigProvider;
 
 pub struct LocalFileStorage<'a> {
     config_dir: Box<Path>,
@@ -99,7 +100,7 @@ mod tests {
     use std::path::{Path, PathBuf};
 
     use crate::{
-        adapters::primary_device::GlobalConfigProvider,
+        core::GlobalConfigProvider,
         devices::local_file_storage::{LocalFileStorage, StandardFileSystem},
     };
 

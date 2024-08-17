@@ -1,112 +1,15 @@
 use itertools::Itertools;
-use toml::Table;
 
-use crate::{
-    adapters::primary_device::GlobalConfigProvider,
-    models::{project::Project, secondary_device::Device},
+use crate::core::{
+    device::{Device, DeviceFactoryRegistry},
+    project::Project,
 };
 
-use super::{
-    config::{
-        from_toml::{parse_toml_global_config, ParseTomlResult},
-        to_toml::ToToml,
-    },
-    device_factories_registry::DeviceFactoryRegistry,
+use super::super::{
+    from_toml::{parse_toml_global_config, ParseTomlResult},
+    to_toml::ToToml,
+    GlobalConfig, GlobalConfigProvider,
 };
-
-pub struct GlobalConfig {
-    devices: Vec<Box<dyn Device>>,
-    projects: Vec<Project>,
-}
-
-impl GlobalConfig {
-    pub fn get_device_by_name(&self, name: &str) -> Option<&Box<dyn Device>> {
-        self.devices.iter().find(|d| d.get_name() == name)
-    }
-
-    pub fn add_device(&mut self, device: Box<dyn Device>) -> Result<(), String> {
-        if self.get_device_by_name(&device.get_name()).is_some() {
-            return Err(format!(
-                "Device with name {} already exists",
-                device.get_name()
-            ));
-        }
-
-        self.devices.push(device);
-        Ok(())
-    }
-
-    pub fn remove_device(&mut self, name: &str) -> Result<(), String> {
-        let index = self
-            .devices
-            .iter()
-            .position(|d| d.get_name() == name)
-            .ok_or_else(|| "Device not found".to_string())?;
-
-        self.devices.remove(index);
-        Ok(())
-    }
-
-    pub fn get_devices(self) -> Vec<Box<dyn Device>> {
-        self.devices
-    }
-
-    pub fn get_devices_iter(&self) -> impl Iterator<Item = &Box<dyn Device>> {
-        self.devices.iter()
-    }
-}
-
-impl GlobalConfig {
-    pub fn get_project_by_name(&self, name: &str) -> Option<&Project> {
-        self.projects.iter().find(|p| p.get_name() == name)
-    }
-
-    fn get_project_by_path(&self, path: &str) -> Option<&Project> {
-        self.projects.iter().find(|p| p.get_location() == path)
-    }
-
-    pub fn add_project(&mut self, project: Project) -> Result<(), String> {
-        if self.get_project_by_name(&project.get_name()).is_some() {
-            return Err(format!(
-                "Project with name {} already exists",
-                project.get_name()
-            ));
-        }
-        if self.get_project_by_path(&project.get_location()).is_some() {
-            return Err(format!(
-                "Project with path {} already exists",
-                project.get_location()
-            ));
-        }
-        self.projects.push(project);
-        Ok(())
-    }
-
-    pub fn remove_project(&mut self, name: &str) -> Result<(), String> {
-        let index = self
-            .projects
-            .iter()
-            .position(|p| p.get_name() == name)
-            .ok_or_else(|| "Project not found".to_string())?;
-
-        self.projects.remove(index);
-        Ok(())
-    }
-
-    pub fn get_projects(self) -> Vec<Project> {
-        self.projects
-    }
-
-    pub fn get_projects_iter(&self) -> impl Iterator<Item = &Project> {
-        self.projects.iter()
-    }
-}
-
-#[derive(serde::Deserialize, serde::Serialize, Debug, Default)]
-struct PartiallyParsedGlobalConfig {
-    devices: Option<Vec<Table>>,
-    projects: Option<Vec<Table>>,
-}
 
 impl GlobalConfig {
     pub fn load(
@@ -209,33 +112,18 @@ impl GlobalConfig {
 }
 
 #[cfg(test)]
-impl GlobalConfig {
-    pub fn new(devices: Vec<Box<dyn Device>>, projects: Vec<Project>) -> Self {
-        Self { devices, projects }
-    }
-}
-
-#[cfg(test)]
 mod tests {
     use mockall::predicate::eq;
 
-    use crate::{
-        adapters::primary_device::MockGlobalConfigProvider,
-        core::{
-            device_factories_registry::DeviceFactoryRegistry,
-            test_utils::mocks::{
-                MockDevice, MockDeviceFactory, MockDeviceWithParameters,
-                MockDeviceWithParametersFactory, MockGlobalConfigProviderFactory,
-            },
-        },
-        models::{
-            backup_requirement::SecurityLevel,
-            project::{Project, ProjectTrackingStatus},
-            secondary_device::DeviceFactory,
-        },
+    use crate::core::project::ProjectTrackingStatus;
+    use crate::core::test_utils::mocks::{
+        MockDevice, MockDeviceFactory, MockDeviceWithParameters, MockDeviceWithParametersFactory,
+        MockGlobalConfigProviderFactory,
     };
+    use crate::core::SecurityLevel;
 
-    use super::GlobalConfig;
+    use super::super::super::MockGlobalConfigProvider;
+    use super::*;
 
     fn get_mock_device_factory_registry() -> DeviceFactoryRegistry {
         let mut registry = DeviceFactoryRegistry::new();
@@ -701,110 +589,6 @@ mod tests {
     }
 
     #[test]
-    fn when_adding_device_to_global_config_it_shall_add_it() {
-        let mut global_config = GlobalConfig {
-            devices: vec![],
-            projects: vec![],
-        };
-
-        let device = MockDeviceFactory
-            .build_from_toml_table("MyPersonalDevice", &toml::Table::new())
-            .unwrap();
-
-        global_config.add_device(device).unwrap();
-        assert_eq!(global_config.devices.len(), 1);
-        assert_eq!(global_config.devices[0].get_name(), "MyPersonalDevice");
-    }
-
-    #[test]
-    fn when_adding_device_to_global_config_if_device_already_exists_it_shall_return_error() {
-        let mut global_config = GlobalConfig {
-            devices: vec![],
-            projects: vec![],
-        };
-
-        let device = MockDeviceFactory
-            .build_from_toml_table("MyPersonalDevice", &toml::Table::new())
-            .unwrap();
-
-        let device2 = MockDeviceFactory
-            .build_from_toml_table("MyPersonalDevice", &toml::Table::new())
-            .unwrap();
-
-        let result = global_config.add_device(device);
-        assert!(result.is_ok());
-
-        let result = global_config.add_device(device2);
-        assert!(result.is_err());
-        assert_eq!(
-            result.err().unwrap(),
-            "Device with name MyPersonalDevice already exists"
-        );
-
-        assert_eq!(global_config.devices.len(), 1);
-    }
-
-    #[test]
-    fn when_saving_config_with_multiple_devices_it_shall_save_config_with_devices() {
-        let mut config_provider = MockGlobalConfigProvider::new();
-        config_provider
-            .expect_write_global_config()
-            .times(1)
-            .with(eq(r#"[[devices]]
-name = "MockDevice"
-type = "MockDevice"
-
-[[devices]]
-name = "MyDevice"
-parameter = "MyParameter"
-type = "MockDeviceWithParameters"
-"#))
-            .return_const(Ok(()));
-
-        let device1 = MockDevice::new("MockDevice");
-        let device2 = MockDeviceWithParameters::new("MyDevice", "MyParameter");
-        let global_config = GlobalConfig {
-            devices: vec![Box::new(device1), Box::new(device2)],
-            projects: vec![],
-        };
-
-        global_config.save(&config_provider).unwrap();
-    }
-
-    #[test]
-    fn when_removing_device_from_global_config_it_shall_remove_it() {
-        let mut global_config = GlobalConfig {
-            devices: vec![],
-            projects: vec![],
-        };
-
-        let device1 = MockDevice::new("MyPersonalDevice");
-        let device2 = MockDevice::new("MySecondPersonalDevice");
-
-        global_config.add_device(Box::new(device1)).unwrap();
-        global_config.add_device(Box::new(device2)).unwrap();
-        assert_eq!(global_config.devices.len(), 2);
-
-        global_config.remove_device("MyPersonalDevice").unwrap();
-        assert_eq!(global_config.devices.len(), 1);
-        assert_eq!(
-            global_config.devices[0].get_name(),
-            "MySecondPersonalDevice"
-        );
-    }
-
-    #[test]
-    fn when_removing_non_existant_device_it_shall_return_error() {
-        let mut global_config = GlobalConfig {
-            devices: vec![],
-            projects: vec![],
-        };
-        let result = global_config.remove_device("NonExistantDevice");
-        assert!(result.is_err());
-        assert_eq!(result.err().unwrap(), "Device not found");
-    }
-
-    #[test]
     fn when_loading_with_untracked_backup_class_config_it_should_reflect_in_the_project() {
         let device_factories_registry = get_mock_device_factory_registry();
         let config_provider = MockGlobalConfigProviderFactory::new(
@@ -948,105 +732,29 @@ type = "MockDeviceWithParameters"
     }
 
     #[test]
-    fn when_we_add_a_project_to_the_config_it_shall_be_visible() {
-        let mut global_config = GlobalConfig {
-            devices: vec![],
+    fn when_saving_config_with_multiple_devices_it_shall_save_config_with_devices() {
+        let mut config_provider = MockGlobalConfigProvider::new();
+        config_provider
+            .expect_write_global_config()
+            .times(1)
+            .with(eq(r#"[[devices]]
+name = "MockDevice"
+type = "MockDevice"
+
+[[devices]]
+name = "MyDevice"
+parameter = "MyParameter"
+type = "MockDeviceWithParameters"
+"#))
+            .return_const(Ok(()));
+
+        let device1 = MockDevice::new("MockDevice");
+        let device2 = MockDeviceWithParameters::new("MyDevice", "MyParameter");
+        let global_config = GlobalConfig {
+            devices: vec![Box::new(device1), Box::new(device2)],
             projects: vec![],
         };
 
-        let project = Project::new("MyProject".to_string(), "/tmp".to_string(), None);
-
-        global_config.add_project(project).unwrap();
-        assert_eq!(global_config.projects.len(), 1);
-        assert_eq!(global_config.projects[0].get_name(), "MyProject");
-        assert_eq!(global_config.projects[0].get_location(), "/tmp");
-    }
-
-    #[test]
-    fn when_we_add_multiple_projects_to_the_config_it_shall_be_visible() {
-        let mut global_config = GlobalConfig {
-            devices: vec![],
-            projects: vec![],
-        };
-
-        let project = Project::new("MyProject".to_string(), "/tmp".to_string(), None);
-        let project2 = Project::new("MySecondProject".to_string(), "/root".to_string(), None);
-
-        global_config.add_project(project).unwrap();
-        global_config.add_project(project2).unwrap();
-        assert_eq!(global_config.projects.len(), 2);
-        assert_eq!(global_config.projects[0].get_name(), "MyProject");
-        assert_eq!(global_config.projects[0].get_location(), "/tmp");
-        assert_eq!(global_config.projects[1].get_name(), "MySecondProject");
-        assert_eq!(global_config.projects[1].get_location(), "/root");
-    }
-
-    #[test]
-    fn when_we_add_a_project_with_same_name_it_should_return_error() {
-        let mut global_config = GlobalConfig {
-            devices: vec![],
-            projects: vec![],
-        };
-
-        let project = Project::new("MyProject".to_string(), "/tmp".to_string(), None);
-        let project2 = Project::new("MyProject".to_string(), "/tmp".to_string(), None);
-
-        global_config.add_project(project).unwrap();
-        let result = global_config.add_project(project2);
-        assert!(result.is_err());
-        assert_eq!(
-            result.err().unwrap(),
-            "Project with name MyProject already exists"
-        );
-    }
-
-    #[test]
-    fn when_we_add_a_project_with_the_same_path_it_should_return_error() {
-        let mut global_config = GlobalConfig {
-            devices: vec![],
-            projects: vec![],
-        };
-
-        let project = Project::new("MyProject".to_string(), "/tmp".to_string(), None);
-        let project2 = Project::new("MySecondProject".to_string(), "/tmp".to_string(), None);
-
-        global_config.add_project(project).unwrap();
-        let result = global_config.add_project(project2);
-        assert!(result.is_err());
-        assert_eq!(
-            result.err().unwrap(),
-            "Project with path /tmp already exists"
-        );
-    }
-
-    #[test]
-    fn when_deleting_project_it_shall_be_removed() {
-        let mut global_config = GlobalConfig {
-            devices: vec![],
-            projects: vec![],
-        };
-
-        let project = Project::new("MyProject".to_string(), "/tmp".to_string(), None);
-        let project2 = Project::new("MySecondProject".to_string(), "/root".to_string(), None);
-
-        global_config.add_project(project).unwrap();
-        global_config.add_project(project2).unwrap();
-        assert_eq!(global_config.projects.len(), 2);
-
-        global_config.remove_project("MyProject").unwrap();
-        assert_eq!(global_config.projects.len(), 1);
-        assert_eq!(global_config.projects[0].get_name(), "MySecondProject");
-    }
-
-    #[test]
-    fn when_deleting_not_registered_project_it_shoud_throw_an_error() {
-        let mut global_config = GlobalConfig {
-            devices: vec![],
-            projects: vec![],
-        };
-
-        let result = global_config.remove_project("MyProject");
-        assert!(result.is_err());
-        assert_eq!(result.err().unwrap(), "Project not found");
+        global_config.save(&config_provider).unwrap();
     }
 }

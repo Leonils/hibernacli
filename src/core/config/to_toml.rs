@@ -2,13 +2,12 @@ use std::time::UNIX_EPOCH;
 
 use toml::Table;
 
-use crate::{
-    core::global_config::GlobalConfig,
-    models::{
-        backup_requirement::BackupRequirementClass,
-        project::{Project, ProjectTrackingStatus},
-    },
+use crate::core::{
+    device::BackupRequirementClass,
+    project::{Project, ProjectTrackingStatus},
 };
+
+use super::GlobalConfig;
 
 #[derive(serde::Deserialize, serde::Serialize, Debug, Default)]
 struct PartiallyParsedGlobalConfig {
@@ -174,13 +173,11 @@ impl ToToml for Project {
 mod tests {
     use std::time::SystemTime;
 
+    use crate::core::config::{GlobalConfig, MockGlobalConfigProvider};
+    use crate::core::test_utils::mocks::{MockDevice, MockDeviceFactory, MockDeviceWithParameters};
+    use crate::core::DeviceFactory;
     use mockall::predicate::eq;
 
-    use crate::adapters::primary_device::MockGlobalConfigProvider;
-    use crate::core::test_utils::mocks::{MockDevice, MockDeviceFactory, MockDeviceWithParameters};
-    use crate::models::secondary_device::DeviceFactory;
-
-    use super::super::super::global_config::GlobalConfig;
     use super::*;
 
     #[test]

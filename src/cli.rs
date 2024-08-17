@@ -1,11 +1,10 @@
 #[cfg(test)]
 use mockall::automock;
 
-use crate::adapters::operations::backup::BackupOperations;
-use crate::adapters::operations::device::DeviceOperations;
-use crate::adapters::operations::project::{AddProjectArgs, ProjectOperations};
-use crate::models::question::QuestionType;
-use crate::models::secondary_device::DeviceFactoryKey;
+use crate::core::{
+    operations::{AddProjectArgs, BackupOperations, DeviceOperations, ProjectOperations},
+    DeviceFactoryKey, QuestionType,
+};
 
 const HELP: &str = r#"
 HibernaCLI
@@ -313,10 +312,10 @@ impl<'a, T: UserInterface, U: DeviceOperations, V: ProjectOperations, W: BackupO
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::adapters::operations::backup::MockBackupOperations;
-    use crate::adapters::operations::device::MockDeviceOperations;
-    use crate::adapters::operations::project::MockProjectOperations;
-    use crate::models::secondary_device::{MockDevice, MockDeviceFactory};
+    use crate::core::{
+        operations::{MockBackupOperations, MockDeviceOperations, MockProjectOperations},
+        MockDevice, MockDeviceFactory,
+    };
     use mockall::predicate::eq;
 
     // Extends assertions of automock to easily test read/write to console

@@ -2,10 +2,7 @@ use std::str::FromStr;
 
 use toml::Table;
 
-use crate::models::{
-    backup_requirement::{BackupRequirementClass, SecurityLevel},
-    project::ProjectTrackingStatus,
-};
+use crate::core::{device::BackupRequirementClass, project::ProjectTrackingStatus, SecurityLevel};
 
 pub trait TryRead<'a, T> {
     fn try_read(&'a self, key: &'a str) -> Result<T, String>;
