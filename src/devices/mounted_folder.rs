@@ -90,6 +90,7 @@ pub struct MountedFolderArchiveWriter {
     project_dir: PathBuf,
     archive_path: PathBuf,
     tar_builder: Option<tar::Builder<std::fs::File>>,
+    finalized: bool,
 }
 
 impl MountedFolderArchiveWriter {
@@ -103,6 +104,7 @@ impl MountedFolderArchiveWriter {
             project_dir,
             archive_path,
             tar_builder: None,
+            finalized: false,
         }
     }
 
@@ -116,6 +118,10 @@ impl MountedFolderArchiveWriter {
     }
 
     fn initialize<'a>(&'a mut self) -> Result<&'a mut tar::Builder<std::fs::File>, ArchiveError> {
+        if self.finalized {
+            return Err(ArchiveError::from("Archive has already been finalized"));
+        }
+
         if self.tar_builder.is_some() {
             return self
                 .tar_builder
@@ -244,6 +250,7 @@ impl ArchiveWriter for MountedFolderArchiveWriter {
 
         // Remove the uncompressed archive
         std::fs::remove_file(&self.archive_path)?;
+        self.finalized = true;
         Ok(())
     }
 }
@@ -337,6 +344,10 @@ impl DeviceFactory for MountedFolderFactory {
 
 #[cfg(test)]
 mod test {
+    use std::fs;
+
+    use crate::core::test_utils::fs::create_tmp_dir;
+
     use super::*;
 
     #[test]
@@ -482,5 +493,119 @@ path = "/media/user/0000-0000"
 type = "MountedFolder"
 "#
         );
+    }
+
+    #[test]
+    fn when_getting_archive_writer_and_adding_no_file_it_shall_create_empty_archive() {
+        let tmp_device = create_tmp_dir();
+        let tmp_device_path = tmp_device.clone();
+        let device = MountedFolder {
+            name: Some("MyUsbKey".to_string()),
+            path: tmp_device,
+        };
+
+        let mut archive_writer = device.get_archive_writer("MyProject");
+        archive_writer.finalize(&vec![], &vec![]).unwrap();
+
+        let project_path = Path::join(&tmp_device_path, "MyProject");
+        let index_path = Path::join(&project_path, "current.index");
+        let tar_path = Path::join(&project_path, "0.tar.gz");
+
+        // Only 2 files: the index and the tar
+        let files = std::fs::read_dir(&project_path).unwrap();
+        assert_eq!(2, files.count());
+        assert!(tar_path.exists());
+        assert!(index_path.exists());
+    }
+
+    #[test]
+    fn finalizing_two_times_the_same_archive_shall_fail() {
+        let tmp_device = create_tmp_dir();
+        let device = MountedFolder {
+            name: Some("MyUsbKey".to_string()),
+            path: tmp_device,
+        };
+
+        let mut archive_writer = device.get_archive_writer("MyProject");
+        archive_writer.finalize(&vec![], &vec![]).unwrap();
+        let result = archive_writer.finalize(&vec![], &vec![]).unwrap_err();
+        assert_eq!("Archive has already been finalized", result.message);
+    }
+
+    #[test]
+    fn when_archiving_the_device_location_shall_exist() {
+        let device = MountedFolder {
+            name: Some("MyUsbKey".to_string()),
+            path: PathBuf::from("/media/user/0000-0000/not-found-device"),
+        };
+
+        let mut archive_writer = device.get_archive_writer("MyProject");
+        let result = archive_writer.finalize(&vec![], &vec![]).unwrap_err();
+        assert_eq!(
+            "Project directory is missing on secondary device and failed to be created",
+            result.message
+        );
+    }
+
+    #[test]
+    fn test_availability_shall_return_error_if_path_is_missing() {
+        let device = MountedFolder {
+            name: Some("MyUsbKey".to_string()),
+            path: PathBuf::from("/media/user/0000-0000/not-found-device"),
+        };
+
+        let result = device.test_availability().unwrap_err();
+        assert_eq!("No such file or directory (os error 2)", result.to_string());
+    }
+
+    #[test]
+    fn test_availability_shall_return_ok_if_dir_exists() {
+        let device_path = create_tmp_dir();
+        let device = MountedFolder {
+            name: Some("MyUsbKey".to_string()),
+            path: device_path,
+        };
+
+        device.test_availability().unwrap();
+    }
+
+    #[test]
+    fn when_adding_a_file_to_archive_it_shall_pass() {
+        let tmp_device = create_tmp_dir();
+        let tmp_project = create_tmp_dir();
+        let device = MountedFolder {
+            name: Some("MyUsbKey".to_string()),
+            path: tmp_device,
+        };
+
+        fs::write(Path::join(&tmp_project, "file.txt"), "Hello, world!").unwrap();
+        let mut file = fs::File::open(Path::join(&tmp_project, "file.txt")).unwrap();
+
+        let mut archive_writer = device.get_archive_writer("MyProject");
+        archive_writer
+            .add_file(&mut file, &PathBuf::from("file.txt"), 0, 0, 13)
+            .unwrap();
+        archive_writer.finalize(&vec![], &vec![]).unwrap();
+    }
+
+    #[test]
+    fn adding_file_after_finalizing_archive_shall_fail() {
+        let tmp_device = create_tmp_dir();
+        let tmp_project = create_tmp_dir();
+        let device = MountedFolder {
+            name: Some("MyUsbKey".to_string()),
+            path: tmp_device,
+        };
+
+        fs::write(Path::join(&tmp_project, "file.txt"), "Hello, world!").unwrap();
+        let mut file = fs::File::open(Path::join(&tmp_project, "file.txt")).unwrap();
+
+        let mut archive_writer = device.get_archive_writer("MyProject");
+        archive_writer.finalize(&vec![], &vec![]).unwrap();
+        let result = archive_writer
+            .add_file(&mut file, &PathBuf::from("file.txt"), 0, 0, 13)
+            .unwrap_err();
+
+        assert_eq!("Archive has already been finalized", result.message);
     }
 }

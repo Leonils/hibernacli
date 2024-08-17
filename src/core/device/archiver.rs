@@ -34,6 +34,7 @@ pub trait ArchiveWriter {
     ) -> Result<(), ArchiveError>;
 }
 
+#[derive(Debug)]
 pub struct ArchiveError {
     pub message: String,
 }
