@@ -118,4 +118,12 @@ pub trait BackupOperations {
     /// Backup one project by its name to one device by its name
     fn backup_project_to_device(&self, project_name: &str, device_name: &str)
         -> Result<(), String>;
+
+    // Restore the given project from its backup on the device to a local location
+    fn restore_project_from_device(
+        &self,
+        project_name: &str,
+        device_name: &str,
+        to: &str,
+    ) -> Result<(), String>;
 }

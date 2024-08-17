@@ -296,6 +296,9 @@ impl<'a, T: UserInterface, U: DeviceOperations, V: ProjectOperations, W: BackupO
 
         let result = match _args[2].as_str() {
             "run" => self.run_backup(_args[3].as_str(), _args[4].as_str()),
+            "restore" if _args.len() == 6 => {
+                self.restore_backup(_args[3].as_str(), _args[4].as_str(), _args[5].as_str())
+            }
             _ => Ok(self.display_invalid_command()),
         };
 
@@ -305,6 +308,20 @@ impl<'a, T: UserInterface, U: DeviceOperations, V: ProjectOperations, W: BackupO
     fn run_backup(&self, project_name: &str, device_name: &str) -> Result<(), String> {
         self.backup_operations
             .backup_project_to_device(project_name, device_name)?;
+        Ok(())
+    }
+
+    fn restore_backup(
+        &self,
+        project_name: &str,
+        device_name: &str,
+        restore_to: &str,
+    ) -> Result<(), String> {
+        self.backup_operations.restore_project_from_device(
+            project_name,
+            device_name,
+            restore_to,
+        )?;
         Ok(())
     }
 }

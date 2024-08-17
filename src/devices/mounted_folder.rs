@@ -1,4 +1,5 @@
 use flate2::write::GzEncoder;
+use itertools::Itertools;
 
 use crate::{
     core::{
@@ -78,17 +79,21 @@ impl Device for MountedFolder {
     }
 
     fn get_archive_writer(&self, project_name: &str) -> Box<dyn ArchiveWriter> {
+        let now = now!().ms_since_epoch().unwrap();
+        let project_dir = Path::join(&self.path, &project_name);
+        let archive_path = Path::join(&project_dir, format!("{}.tar", now));
+
         Box::new(MountedFolderArchiveWriter::new(
             self.path.clone(),
-            project_name.to_string(),
+            project_dir,
+            archive_path,
         ))
     }
 
     fn get_extractor(&self, project_name: &str) -> Box<dyn Extractor> {
-        Box::new(MountedFolderExtractor::new(
-            self.path.clone(),
-            project_name.to_string(),
-        ))
+        let project_dir = Path::join(&self.path, &project_name);
+
+        Box::new(MountedFolderExtractor::new(self.path.clone(), project_dir))
     }
 }
 
@@ -101,11 +106,11 @@ pub struct MountedFolderArchiveWriter {
 }
 
 impl MountedFolderArchiveWriter {
-    pub fn new(path: PathBuf, project_name: String) -> MountedFolderArchiveWriter {
-        let now = now!().ms_since_epoch().unwrap();
-        let project_dir = Path::join(&path, &project_name);
-        let archive_path = Path::join(&project_dir, format!("{}.tar", now));
-
+    pub fn new(
+        path: PathBuf,
+        project_dir: PathBuf,
+        archive_path: PathBuf,
+    ) -> MountedFolderArchiveWriter {
         MountedFolderArchiveWriter {
             path,
             project_dir,
@@ -262,11 +267,34 @@ impl ArchiveWriter for MountedFolderArchiveWriter {
     }
 }
 
-pub struct MountedFolderExtractor {}
+pub struct MountedFolderExtractor {
+    archive_paths: Vec<PathBuf>,
+    index_from_start: usize,
+    index_from_end: usize,
+}
 
 impl MountedFolderExtractor {
-    pub fn new(_path: PathBuf, _project_name: String) -> MountedFolderExtractor {
-        MountedFolderExtractor {}
+    pub fn new(_path: PathBuf, backup_path: PathBuf) -> MountedFolderExtractor {
+        let archive_paths: Vec<PathBuf> = backup_path
+            .read_dir()
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .filter(|path| {
+                path.file_name()
+                    .and_then(|s| s.to_str())
+                    .map_or(false, |s| {
+                        s.ends_with(".tar.gz") && s[..s.len() - 7].chars().all(char::is_numeric)
+                    })
+            })
+            .sorted()
+            .collect();
+
+        let index_from_end = archive_paths.len();
+        MountedFolderExtractor {
+            archive_paths,
+            index_from_start: 0,
+            index_from_end,
+        }
     }
 }
 
@@ -274,23 +302,55 @@ impl Iterator for MountedFolderExtractor {
     type Item = Box<dyn DifferentialArchiveStep>;
 
     fn next(&mut self) -> Option<Box<dyn DifferentialArchiveStep>> {
-        None
+        if self.index_from_start >= self.index_from_end {
+            return None;
+        }
+
+        let archive_path = &self.archive_paths[self.index_from_start];
+        self.index_from_start += 1;
+
+        let archive_name = archive_path
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .to_string();
+
+        Some(Box::new(MountedFolderDifferentialArchiveStep {
+            archive_name,
+        }))
     }
 }
 
 impl DoubleEndedIterator for MountedFolderExtractor {
     fn next_back(&mut self) -> Option<Box<dyn DifferentialArchiveStep>> {
-        None
+        if self.index_from_end <= self.index_from_start {
+            return None;
+        }
+
+        self.index_from_end -= 1;
+        let archive_path = &self.archive_paths[self.index_from_end];
+
+        let archive_name = archive_path
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .to_string();
+
+        Some(Box::new(MountedFolderDifferentialArchiveStep {
+            archive_name,
+        }))
     }
 }
 
 impl Extractor for MountedFolderExtractor {}
 
-pub struct MountedFolderDifferentialArchiveStep {}
+pub struct MountedFolderDifferentialArchiveStep {
+    archive_name: String,
+}
 
 impl DifferentialArchiveStep for MountedFolderDifferentialArchiveStep {
     fn get_step_name(&self) -> &str {
-        "MountedFolderDifferentialArchiveStep"
+        &self.archive_name
     }
 }
 
