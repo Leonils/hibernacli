@@ -3,7 +3,7 @@ use walkdir::WalkDir;
 
 use crate::core::{
     device::{ArchiveError, ArchiveWriter},
-    util::timestamps::{MetadataExt, TimeStampError},
+    util::timestamps::{TimeStampError, Timestamp},
 };
 
 use super::backup_index::{BackupIndex, ToBuffer};
@@ -83,8 +83,8 @@ impl BackupExecution {
             let entry = entry?;
             let path_relative_to_root = entry.path().strip_prefix(&self.root_path)?;
             let metadata = entry.metadata()?;
-            let ctime = metadata.ctime_ms()?;
-            let mtime = metadata.mtime_ms()?;
+            let ctime = metadata.created().ms_since_epoch()?;
+            let mtime = metadata.modified().ms_since_epoch()?;
             let size = metadata.len();
 
             if self
