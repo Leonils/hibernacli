@@ -1,17 +1,20 @@
 use flate2::write::GzEncoder;
 use itertools::Itertools;
+use tar::Entry;
 
 use crate::{
     core::{
         util::timestamps::Timestamp, ArchiveError, ArchiveWriter, Device, DeviceFactory,
         DifferentialArchiveStep, Extractor, Question, QuestionType, SecurityLevel,
     },
+    devices::tar_entry_ext::UnpackFileIn,
     now,
 };
 use std::{
+    collections::HashSet,
     fs::File,
     io::{self, BufRead, Cursor, Read},
-    path::{Path, PathBuf},
+    path::{Component, Path, PathBuf},
     time::{Instant, SystemTime},
 };
 
@@ -309,14 +312,8 @@ impl Iterator for MountedFolderExtractor {
         let archive_path = &self.archive_paths[self.index_from_start];
         self.index_from_start += 1;
 
-        let archive_name = archive_path
-            .file_name()
-            .unwrap()
-            .to_string_lossy()
-            .to_string();
-
         Some(Box::new(MountedFolderDifferentialArchiveStep {
-            archive_name,
+            archive_path: archive_path.clone(),
         }))
     }
 }
@@ -330,14 +327,8 @@ impl DoubleEndedIterator for MountedFolderExtractor {
         self.index_from_end -= 1;
         let archive_path = &self.archive_paths[self.index_from_end];
 
-        let archive_name = archive_path
-            .file_name()
-            .unwrap()
-            .to_string_lossy()
-            .to_string();
-
         Some(Box::new(MountedFolderDifferentialArchiveStep {
-            archive_name,
+            archive_path: archive_path.clone(),
         }))
     }
 }
@@ -345,12 +336,43 @@ impl DoubleEndedIterator for MountedFolderExtractor {
 impl Extractor for MountedFolderExtractor {}
 
 pub struct MountedFolderDifferentialArchiveStep {
-    archive_name: String,
+    archive_path: PathBuf,
+}
+
+impl MountedFolderDifferentialArchiveStep {
+    pub fn walk(&self, to: &PathBuf, paths_to_extract: &HashSet<PathBuf>) -> Result<(), String> {
+        println!("Walking through archive {:?}", self.archive_path);
+        let file = File::open(&self.archive_path).map_err(|e| e.to_string())?;
+        let mut archive = tar::Archive::new(flate2::read::GzDecoder::new(file));
+
+        for entry in archive.entries().map_err(|e| e.to_string())? {
+            let mut entry = entry.map_err(|e| e.to_string())?;
+            let path = entry.path().map_err(|e| e.to_string())?;
+
+            // If path starts with ".files", remove it from path
+            if path.starts_with(".files") {
+                let path = path.strip_prefix(".files").map_err(|e| e.to_string())?;
+                let path = path.to_path_buf();
+                if paths_to_extract.contains(&path) {
+                    entry.unpack_file_in(to).map_err(|e| e.to_string())?;
+                    println!("Extracted {:?}", path);
+                } else {
+                    println!("Skipping {:?}", path);
+                }
+            }
+        }
+
+        Ok(())
+    }
 }
 
 impl DifferentialArchiveStep for MountedFolderDifferentialArchiveStep {
     fn get_step_name(&self) -> &str {
-        &self.archive_name
+        &self.archive_path.to_str().unwrap()
+    }
+
+    fn extract_to(&self, to: &PathBuf, paths_to_extract: &HashSet<PathBuf>) -> Result<(), String> {
+        self.walk(to, paths_to_extract)
     }
 }
 

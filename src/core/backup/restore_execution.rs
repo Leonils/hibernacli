@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{collections::HashSet, path::PathBuf};
 
 use crate::core::{device::DifferentialArchiveStep, Extractor};
 
@@ -31,8 +31,15 @@ impl RestoreExecution {
     }
 
     pub fn extract(&mut self) -> Result<(), String> {
+        let paths_to_extract: HashSet<PathBuf> = self
+            .index
+            .enumerate_entries()
+            .map(|entry| entry.path().to_path_buf())
+            .collect();
+
         for step in self.extractor.by_ref().rev() {
             println!("Extracting step {}", step.get_step_name());
+            step.extract_to(&self.restore_to, &paths_to_extract)?;
         }
 
         // Extract the archive to the destination
