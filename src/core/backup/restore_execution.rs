@@ -1,6 +1,6 @@
-use std::{collections::HashSet, path::PathBuf};
+use std::{collections::HashSet, fmt::Display, io, path::PathBuf};
 
-use crate::core::Extractor;
+use crate::core::{Extractor, ExtractorError};
 
 use super::BackupIndex;
 
@@ -30,17 +30,14 @@ impl RestoreExecution {
         }
     }
 
-    pub fn extract(&mut self) -> Result<(), String> {
+    pub fn extract(&mut self) -> Result<(), RestoreExecutionError> {
         // Create the destination directory if it doesn't exist (fails if it already exists)
         if self.restore_to.exists() {
-            return Err(format!(
-                "Destination directory already exists: {}",
-                self.restore_to.display()
+            return Err(RestoreExecutionError::TargetDirectoryAlreadyExists(
+                self.restore_to.to_string_lossy().to_string(),
             ));
         }
-
-        std::fs::create_dir_all(&self.restore_to)
-            .map_err(|e| format!("Failed to create destination directory: {}", e))?;
+        std::fs::create_dir_all(&self.restore_to)?;
 
         // Extract from index the current list of files that should be in the destination
         let mut paths_to_extract: HashSet<PathBuf> = self
@@ -63,5 +60,34 @@ impl RestoreExecution {
         }
 
         Ok(())
+    }
+}
+
+#[derive(Debug)]
+pub enum RestoreExecutionError {
+    TargetDirectoryAlreadyExists(String),
+    IoError(String),
+    ExtractorError(String),
+}
+
+impl From<ExtractorError> for RestoreExecutionError {
+    fn from(e: ExtractorError) -> Self {
+        Self::ExtractorError(e.message)
+    }
+}
+impl From<io::Error> for RestoreExecutionError {
+    fn from(e: io::Error) -> Self {
+        Self::IoError(e.to_string())
+    }
+}
+impl Display for RestoreExecutionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::TargetDirectoryAlreadyExists(e) => {
+                write!(f, "Target directory already exists: {}", e)
+            }
+            Self::IoError(e) => write!(f, "IO error: {}", e),
+            Self::ExtractorError(e) => write!(f, "ExtractorError error: {}", e),
+        }
     }
 }

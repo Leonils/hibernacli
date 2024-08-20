@@ -89,7 +89,9 @@ impl BackupOperations for Operations {
         let restoration_path = PathBuf::from(to);
         let extractor = device.get_extractor(project_name);
 
-        RestoreExecution::new(index, restoration_path, extractor).extract()
+        RestoreExecution::new(index, restoration_path, extractor)
+            .extract()
+            .map_err(|e| format!("Restore failed: {}", e))
     }
 }
 

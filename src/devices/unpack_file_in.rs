@@ -11,7 +11,7 @@ use tar::Entry;
 /// into the destination directory.
 ///
 /// This implementation is based on the `tar` crate as suggested by the documentation
-/// (https://docs.rs/tar/0.4.26/src/tar/entry.rs.html#221-223)
+/// (https://docs.rs/tar/0.4.41/src/tar/entry.rs.html#381)
 
 pub trait UnpackFileIn {
     fn unpack_file_in(&mut self, dst: &Path) -> io::Result<bool>;

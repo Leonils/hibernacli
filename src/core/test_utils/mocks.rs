@@ -165,7 +165,7 @@ impl Device for MockDevice {
     fn get_archive_writer(&self, _project_name: &str) -> Box<dyn ArchiveWriter> {
         panic!("Mock not implemented for this use case")
     }
-    fn get_extractor(&self, project_name: &str) -> Box<dyn Extractor> {
+    fn get_extractor(&self, _project_name: &str) -> Box<dyn Extractor> {
         panic!("Mock not implemented for this use case")
     }
 }

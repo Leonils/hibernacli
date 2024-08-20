@@ -22,7 +22,7 @@ mod core {
     pub use device::SecurityLevel;
     pub use device::{
         ArchiveError, ArchiveWriter, Device, DeviceFactory, DeviceFactoryKey,
-        DifferentialArchiveStep, Extractor, Question, QuestionType,
+        DifferentialArchiveStep, Extractor, ExtractorError, Question, QuestionType,
     };
 
     #[cfg(test)]
