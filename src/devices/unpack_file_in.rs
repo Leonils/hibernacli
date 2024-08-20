@@ -36,7 +36,7 @@ impl UnpackFileIn for Entry<'_, GzDecoder<File>> {
 
         let mut file_dst = dst.to_path_buf();
         {
-            let path = self.path().unwrap();
+            let path = self.path()?;
             let mut starts_with_files = false;
 
             for part in path.components() {
@@ -78,9 +78,9 @@ impl UnpackFileIn for Entry<'_, GzDecoder<File>> {
             None => return Ok(false),
         };
 
-        self.ensure_dir_created(&dst, parent).unwrap();
+        self.ensure_dir_created(&dst, parent)?;
 
-        self.unpack(&file_dst).unwrap();
+        self.unpack(&file_dst)?;
 
         Ok(true)
     }
