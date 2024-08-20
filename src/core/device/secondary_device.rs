@@ -3,7 +3,7 @@ use mockall::automock;
 
 use std::{io::BufRead, time::Instant};
 
-use super::{ArchiveWriter, DifferentialArchiveStep, Extractor, QuestionType, SecurityLevel};
+use super::{ArchiveWriter, Extractor, QuestionType, SecurityLevel};
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct DeviceFactoryKey {
