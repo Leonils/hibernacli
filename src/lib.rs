@@ -32,7 +32,7 @@ mod core {
 mod devices {
     pub mod local_file_storage;
     pub mod mounted_folder;
-    mod tar_entry_ext;
+    mod unpack_file_in;
 }
 
 pub mod cli;

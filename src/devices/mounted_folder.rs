@@ -1,20 +1,19 @@
 use flate2::write::GzEncoder;
 use itertools::Itertools;
-use tar::Entry;
 
 use crate::{
     core::{
         util::timestamps::Timestamp, ArchiveError, ArchiveWriter, Device, DeviceFactory,
         DifferentialArchiveStep, Extractor, Question, QuestionType, SecurityLevel,
     },
-    devices::tar_entry_ext::UnpackFileIn,
+    devices::unpack_file_in::UnpackFileIn,
     now,
 };
 use std::{
     collections::HashSet,
     fs::File,
     io::{self, BufRead, Cursor, Read},
-    path::{Component, Path, PathBuf},
+    path::{Path, PathBuf},
     time::{Instant, SystemTime},
 };
 
@@ -340,10 +339,15 @@ pub struct MountedFolderDifferentialArchiveStep {
 }
 
 impl MountedFolderDifferentialArchiveStep {
-    pub fn walk(&self, to: &PathBuf, paths_to_extract: &HashSet<PathBuf>) -> Result<(), String> {
+    pub fn walk(
+        &self,
+        to: &PathBuf,
+        paths_to_extract: &HashSet<PathBuf>,
+    ) -> Result<HashSet<PathBuf>, String> {
         println!("Walking through archive {:?}", self.archive_path);
         let file = File::open(&self.archive_path).map_err(|e| e.to_string())?;
         let mut archive = tar::Archive::new(flate2::read::GzDecoder::new(file));
+        let mut extracted_paths = HashSet::new();
 
         for entry in archive.entries().map_err(|e| e.to_string())? {
             let mut entry = entry.map_err(|e| e.to_string())?;
@@ -355,6 +359,7 @@ impl MountedFolderDifferentialArchiveStep {
                 let path = path.to_path_buf();
                 if paths_to_extract.contains(&path) {
                     entry.unpack_file_in(to).map_err(|e| e.to_string())?;
+                    extracted_paths.insert(path.clone());
                     println!("Extracted {:?}", path);
                 } else {
                     println!("Skipping {:?}", path);
@@ -362,7 +367,7 @@ impl MountedFolderDifferentialArchiveStep {
             }
         }
 
-        Ok(())
+        Ok(extracted_paths)
     }
 }
 
@@ -371,7 +376,11 @@ impl DifferentialArchiveStep for MountedFolderDifferentialArchiveStep {
         &self.archive_path.to_str().unwrap()
     }
 
-    fn extract_to(&self, to: &PathBuf, paths_to_extract: &HashSet<PathBuf>) -> Result<(), String> {
+    fn extract_to(
+        &self,
+        to: &PathBuf,
+        paths_to_extract: &HashSet<PathBuf>,
+    ) -> Result<HashSet<PathBuf>, String> {
         self.walk(to, paths_to_extract)
     }
 }
