@@ -21,8 +21,8 @@ mod core {
     pub use config::GlobalConfigProvider;
     pub use device::SecurityLevel;
     pub use device::{
-        ArchiveError, ArchiveWriter, Device, DeviceFactory, DeviceFactoryKey, Question,
-        QuestionType,
+        ArchiveError, ArchiveWriter, Device, DeviceFactory, DeviceFactoryKey,
+        DifferentialArchiveStep, Extractor, ExtractorError, Question, QuestionType,
     };
 
     #[cfg(test)]
@@ -32,6 +32,7 @@ mod core {
 mod devices {
     pub mod local_file_storage;
     pub mod mounted_folder;
+    mod unpack_file_in;
 }
 
 pub mod cli;

@@ -1,4 +1,8 @@
-use std::{fs::File, io, path::PathBuf};
+use std::{
+    fs::File,
+    io,
+    path::{Path, PathBuf},
+};
 
 use crate::core::util::timestamps::TimeStampError;
 
@@ -14,6 +18,7 @@ pub trait ArchiveWriter {
 
     fn add_directory(
         &mut self,
+        src_path: &Path,
         path: &PathBuf,
         ctime: u128,
         mtime: u128,

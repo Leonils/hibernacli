@@ -129,6 +129,10 @@ impl BackupIndex {
             .into_iter()
     }
 
+    pub fn enumerate_entries(&self) -> impl Iterator<Item = &BackupIndexEntry> {
+        self.index.values().into_iter()
+    }
+
     #[cfg(test)]
     pub fn with_entry(mut self, ctime: u128, mtime: u128, size: u64, path: PathBuf) -> Self {
         self.insert(ctime, mtime, size, path);

@@ -1,13 +1,16 @@
 use flate2::write::GzEncoder;
+use itertools::Itertools;
 
 use crate::{
     core::{
-        util::timestamps::Timestamp, ArchiveError, ArchiveWriter, Device, DeviceFactory, Question,
-        QuestionType, SecurityLevel,
+        util::timestamps::Timestamp, ArchiveError, ArchiveWriter, Device, DeviceFactory,
+        DifferentialArchiveStep, Extractor, ExtractorError, Question, QuestionType, SecurityLevel,
     },
+    devices::unpack_file_in::UnpackFileIn,
     now,
 };
 use std::{
+    collections::HashSet,
     fs::File,
     io::{self, BufRead, Cursor, Read},
     path::{Path, PathBuf},
@@ -78,10 +81,21 @@ impl Device for MountedFolder {
     }
 
     fn get_archive_writer(&self, project_name: &str) -> Box<dyn ArchiveWriter> {
+        let now = now!().ms_since_epoch().unwrap();
+        let project_dir = Path::join(&self.path, &project_name);
+        let archive_path = Path::join(&project_dir, format!("{}.tar", now));
+
         Box::new(MountedFolderArchiveWriter::new(
             self.path.clone(),
-            project_name.to_string(),
+            project_dir,
+            archive_path,
         ))
+    }
+
+    fn get_extractor(&self, project_name: &str) -> Box<dyn Extractor> {
+        let project_dir = Path::join(&self.path, &project_name);
+
+        Box::new(MountedFolderExtractor::new(self.path.clone(), project_dir))
     }
 }
 
@@ -94,11 +108,11 @@ pub struct MountedFolderArchiveWriter {
 }
 
 impl MountedFolderArchiveWriter {
-    pub fn new(path: PathBuf, project_name: String) -> MountedFolderArchiveWriter {
-        let now = now!().ms_since_epoch().unwrap();
-        let project_dir = Path::join(&path, &project_name);
-        let archive_path = Path::join(&project_dir, format!("{}.tar", now));
-
+    pub fn new(
+        path: PathBuf,
+        project_dir: PathBuf,
+        archive_path: PathBuf,
+    ) -> MountedFolderArchiveWriter {
         MountedFolderArchiveWriter {
             path,
             project_dir,
@@ -177,20 +191,21 @@ impl ArchiveWriter for MountedFolderArchiveWriter {
         _mtime: u128,
         _size: u64,
     ) -> Result<(), ArchiveError> {
-        self.initialize()?.append_file(
-            Path::join(Path::new(".files"), path.file_name().unwrap()),
-            file,
-        )?;
+        self.initialize()?
+            .append_file(Path::join(Path::new(".files"), path), file)?;
         println!("Adding file {:?} to {:?} secondary device", path, self.path);
         Ok(())
     }
 
     fn add_directory(
         &mut self,
+        src_path: &Path,
         path: &PathBuf,
         _ctime: u128,
         _mtime: u128,
     ) -> Result<(), ArchiveError> {
+        self.initialize()?
+            .append_dir(Path::join(Path::new(".files"), path), src_path)?;
         println!(
             "Adding directory {:?} to {:?} secondary device",
             path, self.path
@@ -252,6 +267,114 @@ impl ArchiveWriter for MountedFolderArchiveWriter {
         std::fs::remove_file(&self.archive_path)?;
         self.finalized = true;
         Ok(())
+    }
+}
+
+pub struct MountedFolderExtractor {
+    archive_paths: Vec<PathBuf>,
+    index_from_start: usize,
+    index_from_end: usize,
+}
+
+impl MountedFolderExtractor {
+    pub fn new(_path: PathBuf, backup_path: PathBuf) -> MountedFolderExtractor {
+        let archive_paths: Vec<PathBuf> = backup_path
+            .read_dir()
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .filter(|path| {
+                path.file_name()
+                    .and_then(|s| s.to_str())
+                    .map_or(false, |s| {
+                        s.ends_with(".tar.gz") && s[..s.len() - 7].chars().all(char::is_numeric)
+                    })
+            })
+            .sorted()
+            .collect();
+
+        let index_from_end = archive_paths.len();
+        MountedFolderExtractor {
+            archive_paths,
+            index_from_start: 0,
+            index_from_end,
+        }
+    }
+}
+
+impl Iterator for MountedFolderExtractor {
+    type Item = Box<dyn DifferentialArchiveStep>;
+
+    fn next(&mut self) -> Option<Box<dyn DifferentialArchiveStep>> {
+        if self.index_from_start >= self.index_from_end {
+            return None;
+        }
+
+        let archive_path = &self.archive_paths[self.index_from_start];
+        self.index_from_start += 1;
+
+        Some(Box::new(MountedFolderDifferentialArchiveStep {
+            archive_path: archive_path.clone(),
+        }))
+    }
+}
+
+impl DoubleEndedIterator for MountedFolderExtractor {
+    fn next_back(&mut self) -> Option<Box<dyn DifferentialArchiveStep>> {
+        if self.index_from_end <= self.index_from_start {
+            return None;
+        }
+
+        self.index_from_end -= 1;
+        let archive_path = &self.archive_paths[self.index_from_end];
+
+        Some(Box::new(MountedFolderDifferentialArchiveStep {
+            archive_path: archive_path.clone(),
+        }))
+    }
+}
+
+impl Extractor for MountedFolderExtractor {}
+
+pub struct MountedFolderDifferentialArchiveStep {
+    archive_path: PathBuf,
+}
+
+impl MountedFolderDifferentialArchiveStep {}
+
+impl DifferentialArchiveStep for MountedFolderDifferentialArchiveStep {
+    fn get_step_name(&self) -> &str {
+        &self.archive_path.to_str().unwrap()
+    }
+
+    fn extract_to(
+        &self,
+        to: &PathBuf,
+        paths_to_extract: &HashSet<PathBuf>,
+    ) -> Result<HashSet<PathBuf>, ExtractorError> {
+        println!("Walking through archive {:?}", self.archive_path);
+        let file = File::open(&self.archive_path)?;
+        let mut archive = tar::Archive::new(flate2::read::GzDecoder::new(file));
+        let mut extracted_paths = HashSet::new();
+
+        for entry in archive.entries()? {
+            let mut entry = entry?;
+            let path = entry.path()?;
+
+            // If path starts with ".files", remove it from path
+            if path.starts_with(".files") {
+                let path = path.strip_prefix(".files")?;
+                let path = path.to_path_buf();
+                if paths_to_extract.contains(&path) {
+                    entry.unpack_file_in(to)?;
+                    extracted_paths.insert(path.clone());
+                    println!("Extracted {:?}", path);
+                } else {
+                    println!("Skipping {:?}", path);
+                }
+            }
+        }
+
+        Ok(extracted_paths)
     }
 }
 

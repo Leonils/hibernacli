@@ -3,7 +3,7 @@ use mockall::automock;
 
 use std::{io::BufRead, time::Instant};
 
-use super::{ArchiveWriter, QuestionType, SecurityLevel};
+use super::{ArchiveWriter, Extractor, QuestionType, SecurityLevel};
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct DeviceFactoryKey {
@@ -42,6 +42,9 @@ pub trait Device {
 
     // Get the archive writer for the device
     fn get_archive_writer(&self, project_name: &str) -> Box<dyn ArchiveWriter>;
+
+    // Get the extractor for the device
+    fn get_extractor(&self, project_name: &str) -> Box<dyn Extractor>;
 }
 
 #[cfg_attr(test, automock)]
