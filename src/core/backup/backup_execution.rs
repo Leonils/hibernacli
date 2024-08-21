@@ -91,14 +91,28 @@ impl BackupExecution {
                 .index
                 .has_changed(path_relative_to_root, ctime, mtime, size)
             {
-                let mut file = File::open(entry.path())?;
-                archiver_writer.add_file(
-                    &mut file,
-                    &PathBuf::from(path_relative_to_root),
-                    ctime,
-                    mtime,
-                    size,
-                )?;
+                if metadata.is_dir() {
+                    archiver_writer.add_directory(
+                        &entry.path(),
+                        &PathBuf::from(path_relative_to_root),
+                        ctime,
+                        mtime,
+                    )?;
+                } else if metadata.is_file() {
+                    let mut file = File::open(entry.path())?;
+                    archiver_writer.add_file(
+                        &mut file,
+                        &PathBuf::from(path_relative_to_root),
+                        ctime,
+                        mtime,
+                        size,
+                    )?;
+                } else {
+                    return Err(BackupExecutionError::ArchiveError(format!(
+                        "Unsupported entry type: {:?}",
+                        path_relative_to_root
+                    )));
+                }
             }
 
             self.index.mark_visited(&path_relative_to_root);
@@ -118,6 +132,8 @@ impl BackupExecution {
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+
     use super::*;
     use crate::core::test_utils::fs::create_tmp_dir;
 
@@ -145,6 +161,7 @@ mod tests {
         }
         fn add_directory(
             &mut self,
+            _src_path: &Path,
             _path: &PathBuf,
             _ctime: u128,
             _mtime: u128,

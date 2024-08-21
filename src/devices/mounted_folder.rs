@@ -191,20 +191,21 @@ impl ArchiveWriter for MountedFolderArchiveWriter {
         _mtime: u128,
         _size: u64,
     ) -> Result<(), ArchiveError> {
-        self.initialize()?.append_file(
-            Path::join(Path::new(".files"), path.file_name().unwrap()),
-            file,
-        )?;
+        self.initialize()?
+            .append_file(Path::join(Path::new(".files"), path), file)?;
         println!("Adding file {:?} to {:?} secondary device", path, self.path);
         Ok(())
     }
 
     fn add_directory(
         &mut self,
+        src_path: &Path,
         path: &PathBuf,
         _ctime: u128,
         _mtime: u128,
     ) -> Result<(), ArchiveError> {
+        self.initialize()?
+            .append_dir(Path::join(Path::new(".files"), path), src_path)?;
         println!(
             "Adding directory {:?} to {:?} secondary device",
             path, self.path
