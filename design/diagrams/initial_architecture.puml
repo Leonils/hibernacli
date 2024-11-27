@@ -1,0 +1,250 @@
+@startuml Archi hex
+
+hide empty members
+' left to right direction
+
+rectangle "Adapters" #FAFAD2 {
+
+    class CLI
+
+
+    rectangle "Ports" #FFCC00 {
+
+        rectangle "Core" #FF8800 {
+            class CoreModules << (M, #FF7700) >>
+        }
+
+        interface CliPort
+        interface SecondaryDevicePort
+        interface PrimaryDevicePort
+    }
+
+    class ConcreteSecondaryDevice
+    class ConcretePrimaryDevice 
+}
+
+CLI ..> CliPort
+CliPort ..> CoreModules
+
+SecondaryDevicePort <|.. ConcreteSecondaryDevice
+PrimaryDevicePort <|.. ConcretePrimaryDevice
+
+CoreModules ..> SecondaryDevicePort
+CoreModules ..> PrimaryDevicePort
+
+@enduml
+
+
+@startuml
+
+hide empty members
+left to right direction
+
+rectangle "Adapters" #FAFAD2 {
+
+    class CommandRunner
+    interface UserInterface
+
+    class Console
+    class LocalFileStorage
+
+
+    rectangle "Ports" #FFCC00 {
+        interface DeviceOperations
+        interface ProjectOperations 
+
+        rectangle "Core" #FF8800 {
+            class Operations
+            class DeviceFactoryRegistry
+            class GlobalConfig
+            class Project
+        }
+
+        interface DeviceFactory
+        interface Device
+        interface GlobalConfigProvider
+    }
+
+    class MountedFolderDeviceFactory
+    class MountedFolderDevice 
+}
+
+UserInterface <|. Console
+CommandRunner .> UserInterface: <<uses>>
+CommandRunner ..> DeviceOperations: <<uses>>
+CommandRunner ..> ProjectOperations: <<uses>>
+
+
+DeviceOperations <|-- Operations
+ProjectOperations <|-- Operations
+
+DeviceFactoryRegistry *-- DeviceFactory
+
+' class LocalFileStorage
+
+DeviceFactory .> Device: <<creates>>
+MountedFolderDeviceFactory .> MountedFolderDevice: <<creates>>
+Device <|.. MountedFolderDevice
+DeviceFactory <|.. MountedFolderDeviceFactory
+
+Operations ..> GlobalConfig: <<uses>>
+Operations ..> DeviceFactoryRegistry: <<uses>>
+
+GlobalConfig .> DeviceFactoryRegistry: <<uses>>
+
+GlobalConfigProvider <|... LocalFileStorage
+
+GlobalConfig .> GlobalConfigProvider: <<uses>>
+
+GlobalConfig *-- Device
+Project --* GlobalConfig
+
+
+
+@enduml
+
+
+@startuml Factory pattern
+
+hide empty members
+
+interface DeviceFactory {
+    +build_from_toml_table(...) -> Result<Box<dyn Device>, String>;
+}
+interface Device
+
+class MountedFolderDeviceFactory
+class MountedFolderDevice 
+
+DeviceFactory <|.. MountedFolderDeviceFactory
+Device <|.. MountedFolderDevice
+
+DeviceFactory .> Device: <<creates>>
+MountedFolderDeviceFactory .> MountedFolderDevice: <<creates>>
+
+
+@enduml
+
+@startuml Builder and Iterator pattern
+
+hide empty members
+
+interface DeviceFactory {
+    +get_question_statement(&self) -> &str;
+    +get_question_type(&self) -> &QuestionType;
+    +set_question_answer(&mut self, answer: String) -> Result<(), String>;
+    +has_next(&self) -> bool;
+    +build() -> Result<Box<dyn Device>, String>;
+}
+interface Device
+
+class MountedFolderDeviceFactory {
+    -path_question: Question
+    -name_question: Question
+    -step: u8
+}
+class MountedFolderDevice {
+    - name: Option<String>
+    - path: PathBuf
+}
+
+DeviceFactory <|.. MountedFolderDeviceFactory
+Device <|.. MountedFolderDevice
+
+DeviceFactory .> Device: <<creates>>
+MountedFolderDeviceFactory .> MountedFolderDevice: <<creates>>
+
+
+@enduml
+
+
+@startuml Facade pattern
+
+hide empty members
+
+left to right direction
+
+
+class CommandRunner
+
+rectangle Facade {
+    interface DeviceOperations
+    interface ProjectOperations 
+    class Operations
+}
+class "Business core" as Module << (M, #FF7700) >>
+
+CommandRunner ..> DeviceOperations: <<uses>>
+CommandRunner ..> ProjectOperations: <<uses>>
+
+DeviceOperations <|-- Operations
+ProjectOperations <|-- Operations
+
+Operations ..> Module: <<uses>>
+
+@enduml
+
+
+@startuml Bridge pattern
+
+hide empty members
+
+left to right direction
+
+
+class LocalFileStorage {
+    -config_dir: Box<Path>,
+    -file_system: &dyn FileSystem,
+    -default_config: &str,
+    new()
+}
+
+interface GlobalConfigProvider {
+    +init_global_config() -> Result
+    +read_global_config() -> Result
+    +write_global_config(content: &str) -> Result
+}
+
+interface FileSystem {
+    +write_file(file_path: PathBuf, content: &str) -> Result
+    +read_file(file_path: PathBuf) -> Result
+    +create_dir_all(dir_path: PathBuf) -> Result
+}
+
+class StandardFileSystem {
+    +write_file(file_path: PathBuf, content: &str) -> Result
+    +read_file(file_path: PathBuf) -> Result
+    +create_dir_all(dir_path: PathBuf) -> Result
+}
+
+GlobalConfigProvider <|. LocalFileStorage
+LocalFileStorage o-- FileSystem
+FileSystem <|. StandardFileSystem
+
+
+
+@enduml
+
+
+@startuml Rust 
+
+hide empty members
+
+interface MyBehavior {
+    u8 get();
+    String to_string();
+}
+
+interface MyOtherBehavior {
+    void act()
+    void reset()
+}
+
+class MyData implements MyBehavior, MyOtherBehavior {
+    -counter: u8
+    +{static} new() -> MyData
+    +ok() -> bool
+}
+
+
+@enduml
